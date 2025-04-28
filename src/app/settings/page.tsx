@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -39,6 +40,30 @@ export default function SettingsPage() {
        router.replace('/postcode');
      }
    }, [addressLoading, favourites, selectedAddress, router]);
+
+   // Function to format address display
+   const formatDisplayAddress = (fullAddress: string): string => {
+       if (!fullAddress) return '';
+       const parts = fullAddress.split(',');
+       if (parts.length >= 2) {
+           const street = parts[0].trim();
+           const town = parts[1].trim(); // Assume second part is the town
+
+           // Basic Title Case for display (handles all caps from API)
+           const titleCase = (str: string) =>
+               str.toLowerCase().replace(/\b(\w)/g, char => char.toUpperCase());
+
+            // Further clean town part (remove postcode if present)
+            const cleanTown = town.replace(/[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}/gi, '').trim();
+
+            if (street && cleanTown) {
+              return `${titleCase(street)}, ${titleCase(cleanTown)}`;
+            }
+       }
+       // Fallback to full address if parsing fails or format is unexpected
+       return fullAddress;
+   };
+
 
   const handleSelectFavourite = (fav: Address) => {
     setAddress(fav); // Set the full address object
@@ -113,12 +138,12 @@ export default function SettingsPage() {
                        <button
                          className="flex-grow flex items-center gap-3 text-left group"
                          onClick={() => handleSelectFavourite(fav)}
-                         aria-label={`Select address: ${fav.address}. ${selectedAddress?.uprn === fav.uprn ? 'Currently selected.' : ''}`}
+                         aria-label={`Select address: ${formatDisplayAddress(fav.address)}. ${selectedAddress?.uprn === fav.uprn ? 'Currently selected.' : ''}`}
                        >
                           <MapPin className={`h-5 w-5 shrink-0 ${selectedAddress?.uprn === fav.uprn ? 'text-primary' : 'text-muted-foreground'}`} />
                           <div className="flex-grow">
                            <span className={`text-sm ${selectedAddress?.uprn === fav.uprn ? 'font-semibold text-primary' : 'text-foreground'}`}>
-                              {fav.address}
+                              {formatDisplayAddress(fav.address)} {/* Use formatted address */}
                            </span>
                            <span className="block text-xs text-muted-foreground">{fav.postcode}</span>
                          </div>
@@ -132,7 +157,7 @@ export default function SettingsPage() {
                         size="icon"
                         className="text-muted-foreground hover:text-destructive h-8 w-8 shrink-0"
                         onClick={(e) => { e.stopPropagation(); handleDeleteFavourite(fav.uprn); }}
-                        aria-label={`Remove ${fav.address} from favourites`}
+                        aria-label={`Remove ${formatDisplayAddress(fav.address)} from favourites`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -203,3 +228,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
