@@ -6,41 +6,54 @@ import { useAddress } from '@/context/address-context';
 import { getBinCollectionData, type BinCollectionData } from '@/services/cornwall-council-api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Header } from '@/components/header';
-import { Trash2, Recycle, Leaf } from 'lucide-react'; // Using Leaf for Garden Waste
-
+import { Trash2, Recycle, Utensils } from 'lucide-react'; // Using Utensils for Food Waste
 
 export default function DashboardPage() {
   const { selectedAddress, loading: addressLoading } = useAddress();
   const [binData, setBinData] = useState<BinCollectionData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); // Add error state
   const router = useRouter();
 
   useEffect(() => {
-    // If address context is still loading, wait.
     if (addressLoading) {
       setIsLoading(true);
+      setError(null); // Clear error on reload
       return;
     }
 
-    // If no address is selected after loading, redirect to postcode entry.
     if (!selectedAddress) {
-      // Check if there are favourites, if so redirect to settings, otherwise postcode
-      // This logic is handled by the context loading now. If no selectedAddress, go to postcode.
-      router.replace('/postcode'); // Use replace to prevent going back to dashboard without address
+      // Redirect logic handled by context/splash/postcode pages
+      // If we reach here without an address after loading, it implies redirection failed or state is inconsistent
+      console.warn("Dashboard reached without selected address after loading.");
+      router.replace('/postcode');
       return;
     }
 
-    // Fetch bin data if an address is selected.
+    // Ensure postcode exists on selectedAddress before fetching
+    if (!selectedAddress.uprn || !selectedAddress.postcode) {
+        console.error("Selected address is missing UPRN or Postcode:", selectedAddress);
+        setError("Selected address information is incomplete. Please re-select your address.");
+        setIsLoading(false);
+        // Optionally clear the invalid address from context/localStorage here
+        return;
+    }
+
+
     const fetchBinData = async () => {
       setIsLoading(true);
+      setError(null); // Clear previous errors
       try {
-        const data = await getBinCollectionData(selectedAddress.uprn);
+        // Pass both UPRN and postcode to the updated service function
+        const data = await getBinCollectionData(selectedAddress.uprn, selectedAddress.postcode);
         setBinData(data);
       } catch (error) {
         console.error('Error fetching bin collection data:', error);
-        // Optionally show a toast message here
+        setError(error instanceof Error ? error.message : 'An unknown error occurred.');
+        setBinData(null); // Clear bin data on error
+        // Optionally show a toast message here using useToast
       } finally {
         setIsLoading(false);
       }
@@ -50,9 +63,8 @@ export default function DashboardPage() {
   }, [selectedAddress, router, addressLoading]);
 
   const formatDate = (date: Date | null): string => {
-    if (!date) return 'N/A';
+    if (!date || !isValid(date)) return 'N/A'; // Check for null and validity
     try {
-      // Format date without year for minimalism if desired, but keeping year for clarity
       return format(date, 'EEEE, do MMMM yyyy');
     } catch (error) {
       console.error('Error formatting date:', error, date);
@@ -64,72 +76,78 @@ export default function DashboardPage() {
     <div className="flex flex-col h-full bg-secondary dark:bg-background">
       <Header showBackButton={false} />
       <div className="flex-grow p-4 md:p-6 space-y-6">
-        <div className="text-center mb-8"> {/* Increased bottom margin */}
-          <h1 className="text-3xl font-bold">Your Bin Collections</h1>
+        <div className="text-center mb-6"> {/* Reduced bottom margin */}
+          <h1 className="text-2xl md:text-3xl font-bold">Your Bin Collections</h1>
            {selectedAddress && (
-             <p className="text-muted-foreground mt-2">
-               Showing collections for: {selectedAddress.address}
+             <p className="text-sm md:text-base text-muted-foreground mt-1">
+               For: {selectedAddress.address}
              </p>
            )}
          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-          {isLoading ? (
-            <>
-              <Skeleton className="h-32 rounded-lg" />
-              <Skeleton className="h-32 rounded-lg" />
-              <Skeleton className="h-32 rounded-lg" />
-            </>
+        {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+              <Skeleton className="h-28 md:h-32 rounded-lg" />
+              <Skeleton className="h-28 md:h-32 rounded-lg" />
+              <Skeleton className="h-28 md:h-32 rounded-lg" />
+            </div>
+          ) : error ? (
+             <Card className="border-destructive bg-destructive/10">
+               <CardHeader>
+                 <CardTitle className="text-destructive text-lg">Error Loading Data</CardTitle>
+               </CardHeader>
+               <CardContent>
+                 <p className="text-destructive-foreground">{error}</p>
+                 <p className="text-muted-foreground text-sm mt-2">Please try selecting your address again or check back later.</p>
+               </CardContent>
+             </Card>
           ) : binData ? (
-            <>
-              {/* Removed shadow-md and hover:shadow-lg */}
-              <Card>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+              {/* General Waste (Rubbish) */}
+              <Card className="shadow-none border">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-base font-medium">General Waste</CardTitle>
+                  <CardTitle className="text-base font-medium">Rubbish</CardTitle>
                   <Trash2 className="h-5 w-5 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl font-semibold">
+                  <div className="text-lg md:text-xl font-semibold">
                     {formatDate(binData.generalWaste)}
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Removed shadow-md and hover:shadow-lg */}
-              <Card>
+              {/* Recycling */}
+              <Card className="shadow-none border">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-base font-medium">Recycling</CardTitle>
                   <Recycle className="h-5 w-5 text-primary" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl font-semibold">
+                  <div className="text-lg md:text-xl font-semibold">
                     {formatDate(binData.recycling)}
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Removed shadow-md and hover:shadow-lg */}
-              <Card>
+               {/* Food Waste */}
+              <Card className="shadow-none border">
                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                   <CardTitle className="text-base font-medium">Garden Waste</CardTitle>
-                   <Leaf className="h-5 w-5 text-green-600" />
+                   <CardTitle className="text-base font-medium">Food Waste</CardTitle>
+                   <Utensils className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                  </CardHeader>
                  <CardContent>
-                   <div className="text-xl font-semibold">
-                     {binData.gardenWaste ? formatDate(binData.gardenWaste) : 'Not Subscribed'}
+                   <div className="text-lg md:text-xl font-semibold">
+                     {formatDate(binData.foodWaste)}
                    </div>
                  </CardContent>
                </Card>
-            </>
+            </div>
           ) : (
             <p className="text-center col-span-1 md:col-span-3 text-muted-foreground">
-              Could not load bin collection data.
+              Could not load bin collection data. Ensure the address is correct.
             </p>
           )}
         </div>
       </div>
-    </div>
   );
 }
-
-    

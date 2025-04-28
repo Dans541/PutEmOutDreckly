@@ -1,5 +1,12 @@
 /**
- * Represents an address.
+ * @fileoverview Service functions for interacting with the Cornwall Council Bin Collection API (via Glitch proxy).
+ */
+
+// Base URL for the custom Glitch API
+const API_BASE_URL = 'https://closed-titanium-baboon.glitch.me/api';
+
+/**
+ * Represents an address, including the postcode used to find it.
  */
 export interface Address {
   /**
@@ -10,119 +17,155 @@ export interface Address {
    * The full address string.
    */
   address: string;
+  /**
+   * The postcode used to search for this address.
+   */
+  postcode: string;
 }
 
 /**
- * Represents bin collection dates.
+ * Represents bin collection dates fetched from the API.
+ * Uses null for dates that couldn't be parsed or aren't provided.
  */
 export interface BinCollectionData {
-  /**
-   * Date for general waste bin collection.
-   */
-  generalWaste: Date | null; // Allow null if API might not return it
-  /**
-   * Date for recycling bin collection.
-   */
-  recycling: Date | null; // Allow null
-  /**
-   * Date for garden waste bin collection. Can be null if not applicable.
-   */
-  gardenWaste: Date | null;
+  generalWaste: Date | null;
+  recycling: Date | null;
+  // Garden waste might not be directly provided by the new API structure,
+  // The Glitch API returns 'food', 'recycling', 'rubbish'.
+  // We'll map 'rubbish' to 'generalWaste'. Assume no separate garden waste for now.
+  // If 'food' needs mapping, it could be added or combined.
+  foodWaste: Date | null;
 }
 
 /**
- * Simulates fetching addresses for a given postcode from an API.
- * In a real app, this would make an HTTP request.
+ * Fetches addresses for a given postcode from the Glitch API.
  * @param postcode The postcode to search for (case-insensitive).
- * @returns A promise that resolves to an array of Address objects.
+ * @returns A promise that resolves to an array of Address objects, including the postcode.
+ * @throws {Error} If the API request fails or returns an error.
  */
-export async function getAddressesByPostcode(postcode: string): Promise<Address[]> {
-  console.log(`Simulating API call for postcode: ${postcode}`);
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  // Basic validation simulation
-  const normalizedPostcode = postcode.toUpperCase().replace(/\s+/g, '');
-  if (!/^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/i.test(normalizedPostcode)) {
-      console.warn("Invalid postcode format provided to mock API");
-      return []; // Return empty for invalid format
+export async function getAddressesByPostcode(postcode: string): Promise<Omit<Address, 'postcode'>[]> {
+  const normalizedPostcode = postcode.trim();
+  if (!normalizedPostcode) {
+    throw new Error('Postcode cannot be empty.');
   }
 
+  const url = `${API_BASE_URL}/addresses?postcode=${encodeURIComponent(normalizedPostcode)}`;
+  console.log(`Fetching addresses from: ${url}`);
 
-  // Mock data - replace with actual API call
-  const mockData: { [key: string]: Address[] } = {
-    'TR11AA': [
-      { uprn: '10001234567', address: '1, Example Street, Town, TR1 1AA' },
-      { uprn: '10001234568', address: 'Flat 2, Example House, Town, TR1 1AA' },
-      { uprn: '10001234569', address: '3 Example Street, Town, TR1 1AA' },
-    ],
-    'PL40AA': [
-      { uprn: '20009876543', address: '10 Downing Street, Plymouth, PL4 0AA' },
-      { uprn: '20009876544', address: 'The Barbican Flat 1, Plymouth, PL4 0AA' },
-    ],
-    'SW1A0AA': [], // Example of postcode with no results
-  };
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
 
-  return mockData[normalizedPostcode] || [];
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+      console.error('API Error Response:', errorData);
+      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorData?.error || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+
+    if (!data || !Array.isArray(data.addresses)) {
+      console.warn('API response did not contain an addresses array:', data);
+      return []; // Return empty array if addresses format is unexpected
+    }
+
+    console.log('Successfully fetched addresses:', data.addresses);
+    // The API returns { address: string, uprn: string } objects.
+    // The postcode will be added by the calling component (PostcodePage).
+    return data.addresses as Omit<Address, 'postcode'>[];
+
+  } catch (error) {
+    console.error('Error fetching addresses from Glitch API:', error);
+    // Re-throw the error to be caught by the calling component
+    if (error instanceof Error) {
+        throw new Error(`Failed to fetch addresses: ${error.message}`);
+    } else {
+        throw new Error('An unknown error occurred while fetching addresses.');
+    }
+  }
 }
 
 /**
- * Simulates fetching bin collection dates for a given address UPRN.
- * In a real app, this would make an HTTP request.
- * @param uprn The UPRN of the address.
- * @returns A promise that resolves to a BinCollectionData object.
+ * Parses an ISO date string (YYYY-MM-DD) from the API into a Date object.
+ * Returns null if the input is invalid or represents an 'Unknown' date.
+ * @param isoDateString The date string from the API.
+ * @returns A Date object or null.
  */
-export async function getBinCollectionData(uprn: string): Promise<BinCollectionData> {
-  console.log(`Simulating API call for UPRN: ${uprn}`);
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 700));
+function parseIsoDate(isoDateString: string | undefined | null): Date | null {
+  if (!isoDateString || typeof isoDateString !== 'string' || isoDateString.toLowerCase() === 'unknown') {
+    return null;
+  }
+  try {
+    // Dates from the API are YYYY-MM-DD. Add time to avoid timezone issues.
+    const date = new Date(`${isoDateString}T00:00:00`);
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn(`Invalid date string received: ${isoDateString}`);
+      return null;
+    }
+    return date;
+  } catch (error) {
+    console.error(`Error parsing date string "${isoDateString}":`, error);
+    return null;
+  }
+}
 
-  // Mock data based on UPRN - replace with actual API call
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalize to start of day
 
-  const getNextDayOfWeek = (dayOfWeek: number): Date => { // 0=Sun, 1=Mon, ..., 6=Sat
-      const resultDate = new Date(today.getTime());
-      resultDate.setDate(today.getDate() + (dayOfWeek + 7 - today.getDay()) % 7);
-      if (resultDate <= today) { // If it's today or past, get next week's day
-          resultDate.setDate(resultDate.getDate() + 7);
-      }
-      return resultDate;
-  };
-
-
-  let data: BinCollectionData;
-
-  // Simple mock logic based on UPRN ending digit
-  const lastDigit = parseInt(uprn.slice(-1), 10);
-
-  if (isNaN(lastDigit)) {
-     // Default fallback if UPRN doesn't end in a digit
-     data = {
-        generalWaste: getNextDayOfWeek(2), // Tuesday
-        recycling: getNextDayOfWeek(5), // Friday
-        gardenWaste: null,
-     }
-  } else if (lastDigit % 3 === 0) {
-     data = {
-       generalWaste: getNextDayOfWeek(1), // Monday
-       recycling: getNextDayOfWeek(1), // Monday (same day)
-       gardenWaste: getNextDayOfWeek(4), // Thursday
-     };
-   } else if (lastDigit % 3 === 1) {
-     data = {
-       generalWaste: getNextDayOfWeek(3), // Wednesday
-       recycling: getNextDayOfWeek(6), // Saturday
-       gardenWaste: null, // No garden waste for this mock group
-     };
-   } else {
-     data = {
-       generalWaste: getNextDayOfWeek(5), // Friday
-       recycling: getNextDayOfWeek(2), // Tuesday
-       gardenWaste: getNextDayOfWeek(5), // Friday (same day as general)
-     };
+/**
+ * Fetches bin collection dates for a given address UPRN and postcode from the Glitch API.
+ * @param uprn The UPRN of the address.
+ * @param postcode The postcode of the address.
+ * @returns A promise that resolves to a BinCollectionData object.
+ * @throws {Error} If the API request fails or returns an error.
+ */
+export async function getBinCollectionData(uprn: string, postcode: string): Promise<BinCollectionData> {
+   if (!uprn || !postcode) {
+     throw new Error('UPRN and postcode are required.');
    }
 
-   console.log("Returning mock bin data:", data);
-   return data;
+   const url = `${API_BASE_URL}/collections?uprn=${encodeURIComponent(uprn)}&postcode=${encodeURIComponent(postcode)}`;
+   console.log(`Fetching collection data from: ${url}`);
+
+   try {
+     const response = await fetch(url, {
+       headers: {
+         'Accept': 'application/json',
+       },
+        timeout: 15000, // Add timeout as per backend code
+     });
+
+     if (!response.ok) {
+       const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+       console.error('API Error Response:', errorData);
+       throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorData?.error || 'Unknown error'}`);
+     }
+
+     const data = await response.json();
+
+     console.log('Successfully fetched collection data:', data);
+
+     // Map API response fields to BinCollectionData interface
+     // API provides: food, recycling, rubbish (each with an 'iso' field)
+     const binData: BinCollectionData = {
+       generalWaste: parseIsoDate(data?.rubbish?.iso),
+       recycling: parseIsoDate(data?.recycling?.iso),
+       foodWaste: parseIsoDate(data?.food?.iso),
+       // Garden waste is not provided by this API endpoint
+     };
+
+     console.log("Parsed bin data:", binData);
+     return binData;
+
+   } catch (error) {
+     console.error('Error fetching collection data from Glitch API:', error);
+      // Re-throw the error
+      if (error instanceof Error) {
+          throw new Error(`Failed to fetch collection data: ${error.message}`);
+      } else {
+          throw new Error('An unknown error occurred while fetching collection data.');
+      }
+   }
 }

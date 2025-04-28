@@ -2,13 +2,13 @@
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { type Address } from '@/services/cornwall-council-api';
-import { useRouter } from 'next/navigation'; // Import useRouter
+// Removed useRouter import as initial redirect logic is moved
 
 interface AddressContextType {
-  selectedAddress: Address | null;
-  favourites: Address[];
-  loading: boolean; // Indicates if loading from localStorage
-  notificationTime: number; // Hour (0-23)
+  selectedAddress: Address | null; // Now includes postcode
+  favourites: Address[]; // Now includes postcode
+  loading: boolean;
+  notificationTime: number;
   notificationsEnabled: boolean;
   setAddress: (address: Address | null) => void;
   addFavourite: (address: Address) => void;
@@ -19,141 +19,144 @@ interface AddressContextType {
 
 const AddressContext = createContext<AddressContextType | undefined>(undefined);
 
-const SELECTED_ADDRESS_KEY = 'selectedAddress';
-const FAVOURITES_KEY = 'favourites';
-const NOTIFICATION_TIME_KEY = 'notificationTime';
-const NOTIFICATIONS_ENABLED_KEY = 'notificationsEnabled';
+// Constants for localStorage keys
+const SELECTED_ADDRESS_KEY = 'putEmOut_selectedAddress_v2'; // Renamed key to avoid conflicts with old format
+const FAVOURITES_KEY = 'putEmOut_favourites_v2'; // Renamed key
+const NOTIFICATION_TIME_KEY = 'putEmOut_notificationTime';
+const NOTIFICATIONS_ENABLED_KEY = 'putEmOut_notificationsEnabled';
+
+// Helper function to safely parse JSON from localStorage
+function safeJsonParse<T>(key: string, defaultValue: T): T {
+  try {
+    const item = localStorage.getItem(key);
+    if (item) {
+      // Add basic validation if needed (e.g., check if parsed object has expected properties)
+      const parsed = JSON.parse(item);
+       // Example validation for Address: check for uprn, address, postcode
+      if (key === SELECTED_ADDRESS_KEY && parsed && typeof parsed.uprn === 'string' && typeof parsed.address === 'string' && typeof parsed.postcode === 'string') {
+        return parsed as T;
+      }
+      // Example validation for Favourites: check if it's an array and items are valid Addresses
+      if (key === FAVOURITES_KEY && Array.isArray(parsed)) {
+         const validFavourites = parsed.filter(fav => fav && typeof fav.uprn === 'string' && typeof fav.address === 'string' && typeof fav.postcode === 'string');
+         // Only return if the structure matches, otherwise default
+         if (validFavourites.length === parsed.length) {
+            return validFavourites as T;
+         } else {
+            console.warn(`Invalid items found in stored favourites for key ${key}. Resetting.`);
+            localStorage.removeItem(key); // Remove invalid data
+            return defaultValue;
+         }
+      }
+      // Basic validation for number/boolean
+       if (key === NOTIFICATION_TIME_KEY && typeof parsed === 'number') return parsed as T;
+       if (key === NOTIFICATIONS_ENABLED_KEY && typeof parsed === 'boolean') return parsed as T;
+
+       // If structure doesn't match expected, return default and remove invalid item
+       console.warn(`Invalid data structure found in localStorage for key ${key}. Resetting.`);
+       localStorage.removeItem(key);
+       return defaultValue;
+    }
+    return defaultValue;
+  } catch (error) {
+    console.error(`Error parsing localStorage key "${key}":`, error);
+    localStorage.removeItem(key); // Remove potentially corrupt item
+    return defaultValue;
+  }
+}
+
+// Helper function to safely set JSON in localStorage
+function safeJsonSet(key: string, value: unknown): void {
+    try {
+        if (value === null || value === undefined) {
+            localStorage.removeItem(key);
+        } else {
+            localStorage.setItem(key, JSON.stringify(value));
+        }
+    } catch (error) {
+        console.error(`Error setting localStorage key "${key}":`, error);
+        // Handle potential storage full errors, etc.
+        // Optionally, show a user notification
+    }
+}
 
 export function AddressProvider({ children }: { children: ReactNode }) {
   const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null);
   const [favourites, setFavouritesState] = useState<Address[]>([]);
-  const [notificationTime, setNotificationTimeState] = useState<number>(18); // Default to 6 PM
-  const [notificationsEnabled, setNotificationsEnabledState] = useState<boolean>(true); // Default to true
-  const [loading, setLoading] = useState(true); // Start loading
-  const router = useRouter(); // Initialize router
+  const [notificationTime, setNotificationTimeState] = useState<number>(18); // Default: 6 PM
+  const [notificationsEnabled, setNotificationsEnabledState] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
 
-  // Load initial state from localStorage
+  // Load initial state from localStorage safely
   useEffect(() => {
-    let initialAddress: Address | null = null;
-    let initialFavourites: Address[] = [];
+    setLoading(true);
+    const initialAddress = safeJsonParse<Address | null>(SELECTED_ADDRESS_KEY, null);
+    const initialFavourites = safeJsonParse<Address[]>(FAVOURITES_KEY, []);
+    const initialTime = safeJsonParse<number>(NOTIFICATION_TIME_KEY, 18);
+    const initialEnabled = safeJsonParse<boolean>(NOTIFICATIONS_ENABLED_KEY, true);
 
-    try {
-      const storedAddress = localStorage.getItem(SELECTED_ADDRESS_KEY);
-      if (storedAddress) {
-        initialAddress = JSON.parse(storedAddress);
-        setSelectedAddressState(initialAddress);
-      }
+    setSelectedAddressState(initialAddress);
+    setFavouritesState(initialFavourites);
+    setNotificationTimeState(initialTime);
+    setNotificationsEnabledState(initialEnabled);
 
-      const storedFavourites = localStorage.getItem(FAVOURITES_KEY);
-      if (storedFavourites) {
-        initialFavourites = JSON.parse(storedFavourites);
-        setFavouritesState(initialFavourites);
-      }
-
-      const storedTime = localStorage.getItem(NOTIFICATION_TIME_KEY);
-       if (storedTime) {
-         setNotificationTimeState(parseInt(storedTime, 10));
-       } else {
-         setNotificationTimeState(18); // Default if not set
-         localStorage.setItem(NOTIFICATION_TIME_KEY, '18');
-       }
-
-       const storedEnabled = localStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
-       if (storedEnabled) {
-         setNotificationsEnabledState(JSON.parse(storedEnabled));
-       } else {
-         setNotificationsEnabledState(true); // Default if not set
-         localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, JSON.stringify(true));
-       }
-
-    } catch (error) {
-      console.error("Error loading state from localStorage:", error);
-      // Reset to defaults if localStorage is corrupt or unavailable
-      localStorage.removeItem(SELECTED_ADDRESS_KEY);
-      localStorage.removeItem(FAVOURITES_KEY);
-      localStorage.setItem(NOTIFICATION_TIME_KEY, '18');
-      localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, JSON.stringify(true));
-      setSelectedAddressState(null);
-      setFavouritesState([]);
-      setNotificationTimeState(18);
-      setNotificationsEnabledState(true);
-      initialAddress = null; // Reset initial values too
-      initialFavourites = [];
-    } finally {
-      setLoading(false); // Finished loading
-      // --- Initial Redirect Logic ---
-      // Check *after* loading is complete and state is set
-      // This check needs to happen outside the main flow if possible,
-      // perhaps in the SplashScreen or initial page load logic.
-      // Keeping it here might cause issues if the component unmounts/remounts.
-      // Moved this logic to SplashScreen and PostcodePage useEffects
-      // -----------------------------
+    // Set defaults in storage if they were missing
+    if (localStorage.getItem(NOTIFICATION_TIME_KEY) === null) {
+        safeJsonSet(NOTIFICATION_TIME_KEY, 18);
     }
-  }, []); // Run only once on mount
+    if (localStorage.getItem(NOTIFICATIONS_ENABLED_KEY) === null) {
+        safeJsonSet(NOTIFICATIONS_ENABLED_KEY, true);
+    }
 
 
-  // Update localStorage whenever state changes
+    setLoading(false); // Finished loading
+    // Initial redirect logic is now handled by SplashScreen and PostcodePage
+  }, []);
+
+  // Update localStorage whenever state changes, only after initial load
   useEffect(() => {
-    if (!loading) { // Only save after initial load
-      try {
-        if (selectedAddress) {
-          localStorage.setItem(SELECTED_ADDRESS_KEY, JSON.stringify(selectedAddress));
-        } else {
-          localStorage.removeItem(SELECTED_ADDRESS_KEY);
-        }
-      } catch (error) {
-         console.error("Error saving selected address to localStorage:", error);
-      }
+    if (!loading) {
+      safeJsonSet(SELECTED_ADDRESS_KEY, selectedAddress);
     }
   }, [selectedAddress, loading]);
 
   useEffect(() => {
     if (!loading) {
-       try {
-           localStorage.setItem(FAVOURITES_KEY, JSON.stringify(favourites));
-       } catch (error) {
-           console.error("Error saving favourites to localStorage:", error);
-       }
+       safeJsonSet(FAVOURITES_KEY, favourites);
     }
   }, [favourites, loading]);
 
   useEffect(() => {
     if (!loading) {
-      try {
-        localStorage.setItem(NOTIFICATION_TIME_KEY, String(notificationTime));
-      } catch (error) {
-         console.error("Error saving notification time to localStorage:", error);
-      }
+      safeJsonSet(NOTIFICATION_TIME_KEY, notificationTime);
     }
   }, [notificationTime, loading]);
 
    useEffect(() => {
      if (!loading) {
-       try {
-         localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, JSON.stringify(notificationsEnabled));
-       } catch (error) {
-          console.error("Error saving notifications enabled state to localStorage:", error);
-       }
+       safeJsonSet(NOTIFICATIONS_ENABLED_KEY, notificationsEnabled);
      }
    }, [notificationsEnabled, loading]);
 
 
   const setAddress = (address: Address | null) => {
     setSelectedAddressState(address);
+    // No direct storage update here, handled by useEffect
   };
 
   const addFavourite = (address: Address) => {
+     // Ensure address has postcode before adding
+     if (!address.postcode) {
+         console.error("Attempted to add favourite without a postcode:", address);
+         // Optionally show a toast to the user
+         return;
+     }
     setFavouritesState((prev) => {
-      // Avoid duplicates
       if (prev.some(fav => fav.uprn === address.uprn)) {
-        return prev;
+        return prev; // Already favourited
       }
       const updatedFavourites = [...prev, address];
-       try {
-         localStorage.setItem(FAVOURITES_KEY, JSON.stringify(updatedFavourites)); // Also update storage here
-       } catch (error) {
-           console.error("Error saving favourites to localStorage:", error);
-       }
+      // No direct storage update here, handled by useEffect
       return updatedFavourites;
     });
   };
@@ -162,23 +165,16 @@ export function AddressProvider({ children }: { children: ReactNode }) {
      let wasSelected = false;
      setFavouritesState((prev) => {
        const updatedFavourites = prev.filter(fav => fav.uprn !== uprn);
-        try {
-          localStorage.setItem(FAVOURITES_KEY, JSON.stringify(updatedFavourites)); // Update storage
-        } catch (error) {
-            console.error("Error saving favourites to localStorage:", error);
-        }
+       // No direct storage update here, handled by useEffect
        return updatedFavourites;
      });
 
+     // If the removed favourite was the currently selected address, clear selection
      setSelectedAddressState(prevSelected => {
         if (prevSelected?.uprn === uprn) {
             wasSelected = true;
-            try {
-                localStorage.removeItem(SELECTED_ADDRESS_KEY); // Remove selected from storage
-            } catch (error) {
-                console.error("Error removing selected address from localStorage:", error);
-            }
-            return null; // Clear selection
+            // No direct storage update here, handled by useEffect
+            return null;
         }
         return prevSelected;
      });
@@ -186,24 +182,17 @@ export function AddressProvider({ children }: { children: ReactNode }) {
 
 
   const setNotificationTime = (time: number) => {
-     // Basic validation
      if (time >= 0 && time <= 23) {
        setNotificationTimeState(time);
-       try {
-         localStorage.setItem(NOTIFICATION_TIME_KEY, String(time)); // Update storage
-       } catch (error) {
-          console.error("Error saving notification time to localStorage:", error);
-       }
+       // No direct storage update here, handled by useEffect
+     } else {
+       console.warn(`Invalid notification time set: ${time}`);
      }
    };
 
    const setNotificationsEnabled = (enabled: boolean) => {
      setNotificationsEnabledState(enabled);
-     try {
-       localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, JSON.stringify(enabled)); // Update storage
-     } catch (error) {
-        console.error("Error saving notifications enabled state to localStorage:", error);
-     }
+     // No direct storage update here, handled by useEffect
    };
 
   return (
@@ -231,5 +220,3 @@ export function useAddress(): AddressContextType {
   }
   return context;
 }
-
-    
