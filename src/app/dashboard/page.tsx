@@ -25,35 +25,28 @@ export default function DashboardPage() {
     }
 
     if (!selectedAddress) {
-      // Redirect logic handled by context/splash/postcode pages
-      // If we reach here without an address after loading, it implies redirection failed or state is inconsistent
       console.warn("Dashboard reached without selected address after loading.");
       router.replace('/postcode');
       return;
     }
 
-    // Ensure postcode exists on selectedAddress before fetching
     if (!selectedAddress.uprn || !selectedAddress.postcode) {
         console.error("Selected address is missing UPRN or Postcode:", selectedAddress);
         setError("Selected address information is incomplete. Please re-select your address.");
         setIsLoading(false);
-        // Optionally clear the invalid address from context/localStorage here
         return;
     }
-
 
     const fetchBinData = async () => {
       setIsLoading(true);
       setError(null); // Clear previous errors
       try {
-        // Pass both UPRN and postcode to the updated service function
         const data = await getBinCollectionData(selectedAddress.uprn, selectedAddress.postcode);
         setBinData(data);
       } catch (error) {
         console.error('Error fetching bin collection data:', error);
         setError(error instanceof Error ? error.message : 'An unknown error occurred.');
         setBinData(null); // Clear bin data on error
-        // Optionally show a toast message here using useToast
       } finally {
         setIsLoading(false);
       }
@@ -63,36 +56,41 @@ export default function DashboardPage() {
   }, [selectedAddress, router, addressLoading]);
 
   const formatDate = (date: Date | null): string => {
-    if (!date || !isValid(date)) return 'N/A'; // Check for null and validity
+    if (!date || !isValid(date)) return 'Not scheduled'; // More informative text
     try {
-      return format(date, 'EEEE, do MMMM yyyy');
+      return format(date, 'EEEE, do MMMM'); // Simplified format
     } catch (error) {
       console.error('Error formatting date:', error, date);
       return 'Invalid Date';
     }
   };
 
+  // Function to calculate animation delay
+  const getAnimationDelay = (index: number) => `${index * 0.1}s`;
+
   return (
-    <div className="flex flex-col h-full bg-secondary dark:bg-background">
+    // Use background for the whole page container
+    <div className="flex flex-col h-full bg-background">
       <Header showBackButton={false} />
       <div className="flex-grow p-4 md:p-6 space-y-6">
-        <div className="text-center mb-6"> {/* Reduced bottom margin */}
-          <h1 className="text-2xl md:text-3xl font-bold">Your Bin Collections</h1>
+        <div className="text-center mb-6 animate-fade-in">
+          <h1 className="text-2xl md:text-3xl font-bold">Your Collections</h1>
            {selectedAddress && (
              <p className="text-sm md:text-base text-muted-foreground mt-1">
-               For: {selectedAddress.address}
+               {selectedAddress.address}, {selectedAddress.postcode}
              </p>
            )}
          </div>
 
         {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-              <Skeleton className="h-28 md:h-32 rounded-lg" />
-              <Skeleton className="h-28 md:h-32 rounded-lg" />
-              <Skeleton className="h-28 md:h-32 rounded-lg" />
+              {/* Consistent skeleton styling */}
+              <Skeleton className="h-32 md:h-36 rounded-lg" />
+              <Skeleton className="h-32 md:h-36 rounded-lg" />
+              <Skeleton className="h-32 md:h-36 rounded-lg" />
             </div>
           ) : error ? (
-             <Card className="border-destructive bg-destructive/10">
+             <Card className="border-destructive bg-destructive/10 animate-fade-in">
                <CardHeader>
                  <CardTitle className="text-destructive text-lg">Error Loading Data</CardTitle>
                </CardHeader>
@@ -104,7 +102,10 @@ export default function DashboardPage() {
           ) : binData ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
               {/* General Waste (Rubbish) */}
-              <Card className="shadow-none border">
+              <Card
+                className="animate-slide-up"
+                style={{ animationDelay: getAnimationDelay(0) }}
+              >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-base font-medium">Rubbish</CardTitle>
                   <Trash2 className="h-5 w-5 text-muted-foreground" />
@@ -113,11 +114,16 @@ export default function DashboardPage() {
                   <div className="text-lg md:text-xl font-semibold">
                     {formatDate(binData.generalWaste)}
                   </div>
+                  {/* Optional: Add next collection day if available */}
+                  {/* <p className="text-xs text-muted-foreground pt-1">Next: {formatDate(binData.nextGeneralWaste)}</p> */}
                 </CardContent>
               </Card>
 
               {/* Recycling */}
-              <Card className="shadow-none border">
+              <Card
+                className="animate-slide-up"
+                style={{ animationDelay: getAnimationDelay(1) }}
+              >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-base font-medium">Recycling</CardTitle>
                   <Recycle className="h-5 w-5 text-primary" />
@@ -130,9 +136,13 @@ export default function DashboardPage() {
               </Card>
 
                {/* Food Waste */}
-              <Card className="shadow-none border">
+              <Card
+                className="animate-slide-up"
+                style={{ animationDelay: getAnimationDelay(2) }}
+               >
                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                    <CardTitle className="text-base font-medium">Food Waste</CardTitle>
+                   {/* Using a consistent color from theme */}
                    <Utensils className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                  </CardHeader>
                  <CardContent>
@@ -143,7 +153,7 @@ export default function DashboardPage() {
                </Card>
             </div>
           ) : (
-            <p className="text-center col-span-1 md:col-span-3 text-muted-foreground">
+            <p className="text-center col-span-1 md:col-span-3 text-muted-foreground animate-fade-in">
               Could not load bin collection data. Ensure the address is correct.
             </p>
           )}

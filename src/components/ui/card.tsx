@@ -9,11 +9,12 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      // Reduced default shadow from shadow-sm to a very subtle one or none if preferred
-      // Option 1: Very subtle shadow
-      "rounded-lg border bg-card text-card-foreground shadow-[0_1px_3px_0_rgba(0,0,0,0.03),0_1px_2px_-1px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_3px_0_rgba(255,255,255,0.03),0_1px_2px_-1px_rgba(255,255,255,0.03)]",
-      // Option 2: No default shadow (rely solely on border)
-      // "rounded-lg border bg-card text-card-foreground",
+      // Minimalist styling:
+      // Light mode: No border, very subtle shadow, background provides separation.
+      // Dark mode: Keep border for clarity on dark backgrounds.
+      "rounded-lg bg-card text-card-foreground",
+      "border-transparent dark:border dark:border-border", // No border light, border dark
+      "shadow-[0_1px_3px_0_rgba(0,0,0,0.02),0_1px_2px_-1px_rgba(0,0,0,0.01)] dark:shadow-none", // Very subtle shadow light, none dark
       className
     )}
     {...props}
@@ -27,23 +28,22 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    // Reduced padding slightly from p-6 to p-4
-    className={cn("flex flex-col space-y-1.5 p-4", className)}
+    // Consistent padding
+    className={cn("flex flex-col space-y-1.5 p-4 md:p-5", className)}
     {...props}
   />
 ))
 CardHeader.displayName = "CardHeader"
 
 const CardTitle = React.forwardRef<
-  // Changed element type from div to h3 for better semantics
   HTMLHeadingElement,
   React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
   <h3
     ref={ref}
-    // Reduced font size from text-2xl to text-lg or text-xl
+    // Slightly larger title
     className={cn(
-      "text-lg font-semibold leading-none tracking-tight", // Changed to text-lg
+      "text-lg font-semibold leading-none tracking-tight md:text-xl",
       className
     )}
     {...props}
@@ -52,11 +52,10 @@ const CardTitle = React.forwardRef<
 CardTitle.displayName = "CardTitle"
 
 const CardDescription = React.forwardRef<
-  // Changed element type from div to p for better semantics
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p // Changed to p
+  <p
     ref={ref}
     className={cn("text-sm text-muted-foreground", className)}
     {...props}
@@ -67,25 +66,22 @@ CardDescription.displayName = "CardDescription"
 const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
-  // Reduced padding slightly from p-6 pt-0 to p-4 pt-0
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-4 pt-0", className)} {...props} />
+  // Consistent padding, adjust top padding based on whether header exists
+  <div ref={ref} className={cn("p-4 md:p-5 pt-0", className)} {...props} />
 ))
 CardContent.displayName = "CardContent"
 
 const CardFooter = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
-  // Reduced padding slightly from p-6 pt-0 to p-4 pt-0
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex items-center p-4 pt-0", className)}
+    className={cn("flex items-center p-4 md:p-5 pt-0", className)}
     {...props}
   />
 ))
 CardFooter.displayName = "CardFooter"
 
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
-
-    

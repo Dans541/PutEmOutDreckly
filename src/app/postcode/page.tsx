@@ -28,9 +28,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, Home, Trash } from 'lucide-react'; // Changed icon
+import { Loader2, Search, Home, Trash2 } from 'lucide-react'; // Ensure Trash2 is imported
 import { useToast } from '@/hooks/use-toast';
-// Header component is removed from this page
 
 // Adjusted regex for better flexibility with spacing
 const postcodeSchema = z.object({
@@ -73,8 +72,9 @@ export default function PostcodePage() {
      if (!addressLoading) {
        if (selectedAddress) {
          router.replace('/dashboard');
-       } else if (favourites.length > 0) {
-         router.replace('/settings');
+       } else if (favourites.length > 0 && window.location.pathname !== '/settings') {
+         // Only redirect if not already going to settings
+         // router.replace('/settings'); - Decided against auto-redirect to settings
        }
      }
    }, [addressLoading, selectedAddress, favourites, router]);
@@ -89,13 +89,11 @@ export default function PostcodePage() {
     setAddresses([]); // Clear previous results
 
     try {
-      // Call the API with the original user input format if needed, or the normalized one
-      // Assuming API handles normalization or prefers the normalized version:
       const fetchedAddresses = await getAddressesByPostcode(searchPostcode);
 
       if (fetchedAddresses.length > 0) {
         setAddresses(fetchedAddresses);
-        setShowAddressList(true);
+        setShowAddressList(true); // Show list immediately
         // Blur input
         const postcodeField = document.getElementById('postcode');
         if (postcodeField instanceof HTMLInputElement) {
@@ -139,17 +137,16 @@ export default function PostcodePage() {
     }
   };
 
-  // Effect to hide list on focus removed for better UX
-  // useEffect(() => { ... });
-
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 h-full bg-secondary dark:bg-background">
-       <div className="flex items-center mb-6 text-center pt-10">
-         <Trash className="h-9 w-9 text-primary mr-2" /> {/* Use a relevant icon */}
+    // Use background for the container
+    <div className="flex flex-col items-center justify-center p-4 h-full bg-background">
+       <div className="flex items-center mb-6 text-center pt-10 animate-fade-in">
+         <Trash2 className="h-9 w-9 text-primary mr-2" /> {/* Use a relevant icon */}
          <h1 className="text-2xl md:text-3xl font-bold">Put 'Em Out Dreckly</h1>
        </div>
-      <Card className="w-full max-w-md shadow-none border-0 md:border md:shadow-sm bg-card">
+       {/* Minimal card: no border/shadow on light, subtle border on dark */}
+      <Card className="w-full max-w-md border-none shadow-none bg-transparent md:bg-card md:dark:border animate-fade-in" style={{ animationDelay: '0.2s' }}>
         <CardHeader>
           <CardTitle className="text-xl md:text-2xl text-center">Find Your Collections</CardTitle>
           <CardDescription className="text-center text-sm">
@@ -164,17 +161,18 @@ export default function PostcodePage() {
                 name="postcode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Postcode</FormLabel>
+                    <FormLabel className="sr-only">Postcode</FormLabel> {/* Hide label visually */}
                     <div className="flex items-center space-x-2">
                       <FormControl>
                         <Input
                           id="postcode"
-                          placeholder="e.g., TR1 1AA"
+                          placeholder="Enter postcode..." // Simpler placeholder
                           {...field}
                            // Use field.value which might be different from form.getValues if transform runs late
                           value={field.value || ''} // Controlled component
                           onChange={(e) => field.onChange(e.target.value.toUpperCase())} // Uppercase on input
                           className="flex-grow text-base" // Ensure readable text size
+                          aria-label="Postcode" // Add aria-label since visual label is hidden
                           aria-describedby="postcode-error"
                           aria-invalid={!!form.formState.errors.postcode}
                           autoCapitalize="characters"
@@ -198,19 +196,22 @@ export default function PostcodePage() {
           </Form>
 
           {showAddressList && addresses.length > 0 && (
-            <div className="mt-5">
-              <h3 className="text-base md:text-lg font-semibold mb-2 flex items-center gap-2">
+             // Add animation to the address list container
+            <div className="mt-5 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+              <h3 className="text-base md:text-lg font-medium mb-2 flex items-center gap-2"> {/* Changed font-semibold to medium */}
                 <Home className="h-4 w-4 text-muted-foreground" /> Select Your Address:
               </h3>
-              <ScrollArea className="h-52 md:h-60 w-full rounded-md border bg-background">
+               {/* Lighter background for scroll area in light mode */}
+              <ScrollArea className="h-52 md:h-60 w-full rounded-md border bg-white dark:bg-background">
                 <div className="p-1 space-y-1">
                   {addresses.map((addr) => (
                     <Button
                       key={addr.uprn}
-                      variant={selectedFetchedAddress?.uprn === addr.uprn ? 'secondary' : 'ghost'} // Highlight selected
+                       // Use primary variant for selected, ghost for others
+                      variant={selectedFetchedAddress?.uprn === addr.uprn ? 'default' : 'ghost'}
                       className={`w-full text-left justify-start h-auto py-2.5 px-3 whitespace-normal text-sm leading-snug ${
                         selectedFetchedAddress?.uprn === addr.uprn
-                          ? 'bg-secondary text-secondary-foreground font-medium' // Use secondary for selected
+                          ? 'bg-primary/10 text-primary font-semibold' // Highlight selected
                           : 'hover:bg-muted/50'
                       }`}
                       onClick={() => setSelectedFetchedAddress(addr)} // Select the FetchedAddress
@@ -224,7 +225,8 @@ export default function PostcodePage() {
               <Button
                 onClick={handleConfirmSelection}
                 disabled={!selectedFetchedAddress || isLoading}
-                className="w-full mt-4 bg-accent hover:bg-accent/90 text-accent-foreground"
+                 // Use primary variant for confirm button
+                className="w-full mt-4"
               >
                 Confirm Selection
               </Button>
@@ -234,7 +236,7 @@ export default function PostcodePage() {
       </Card>
        {/* Link to settings if favourites exist and none selected */}
         {!addressLoading && favourites.length > 0 && !selectedAddress && (
-         <Button variant="link" onClick={() => router.push('/settings')} className="mt-5 text-sm">
+         <Button variant="link" onClick={() => router.push('/settings')} className="mt-5 text-sm animate-fade-in" style={{ animationDelay: '0.4s' }}>
            Go to Favourites
          </Button>
        )}

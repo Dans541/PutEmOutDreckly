@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useAddress } from '@/context/address-context';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Removed CardDescription import
+import { Card, CardContent } from '@/components/ui/card'; // Removed Header/Title imports
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Star, BellRing, PlusCircle, Loader2 } from 'lucide-react'; // Added Loader2
+import { Trash2, Star, BellRing, PlusCircle, Loader2, Home } from 'lucide-react'; // Added Home
 import { Header } from '@/components/header';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -45,7 +45,7 @@ export default function SettingsPage() {
     setAddress(fav); // Set the full address object
     toast({
       title: 'Address Selected',
-      description: `Showing collections for ${fav.address}`, // Display text remains the same
+      description: `Showing collections for ${fav.address}`,
     });
     router.push('/dashboard');
   };
@@ -57,10 +57,12 @@ export default function SettingsPage() {
       description: 'Address removed from your favourites.',
       variant: 'destructive'
     });
-    // Redirect check logic remains the same
+    // Redirect if it was the last favourite and wasn't selected
      if (favourites.length === 1 && !selectedAddress) {
          setTimeout(() => router.replace('/postcode'), 100);
      }
+     // If the deleted one *was* selected, the context handles clearing it,
+     // and the dashboard/postcode page will handle redirect if needed.
   };
 
   const handleNotificationToggle = (enabled: boolean) => {
@@ -87,7 +89,8 @@ export default function SettingsPage() {
 
   if (!isClient || addressLoading) {
      return (
-       <div className="flex flex-col h-full bg-secondary dark:bg-background">
+       // Use background for the container
+       <div className="flex flex-col h-full bg-background">
          <Header showBackButton={true} backDestination="/dashboard" />
          <div className="flex-grow p-4 md:p-6 space-y-6 flex items-center justify-center">
            <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -99,37 +102,45 @@ export default function SettingsPage() {
 
 
   return (
-    <div className="flex flex-col h-full bg-secondary dark:bg-background">
+     // Use background for the container
+    <div className="flex flex-col h-full bg-background">
        {/* Ensure back button always goes to dashboard from settings */}
       <Header showBackButton={true} backDestination="/dashboard" />
       <div className="flex-grow p-4 md:p-6 space-y-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-center">Settings</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-center animate-fade-in">Settings</h1>
 
         {/* Favourites Section */}
-        <div>
+        <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <h2 className="text-lg md:text-xl font-semibold mb-4 flex items-center gap-2">
             <Star className="h-5 w-5 text-yellow-400" /> Favourite Addresses
           </h2>
+           {/* Minimal card: no border/shadow on light, subtle border on dark */}
           {favourites.length > 0 ? (
-             <Card className="shadow-none border"> {/* Keep card for grouping */}
+             <Card className="border-transparent dark:border shadow-none bg-card">
                <CardContent className="p-0">
                  <ul className="divide-y divide-border">
                    {favourites.map((fav) => (
                      <li key={fav.uprn} className="flex items-center justify-between p-3 md:p-4 hover:bg-muted/50 transition-colors duration-150">
                        <button
-                         className={`flex-grow mr-2 text-left text-sm md:text-base ${selectedAddress?.uprn === fav.uprn ? 'font-semibold text-primary' : 'text-foreground'}`}
+                         className="flex-grow mr-2 text-left text-sm md:text-base group" // Added group for potential future use
                          onClick={() => handleSelectFavourite(fav)}
                          aria-label={`Select address: ${fav.address}. ${selectedAddress?.uprn === fav.uprn ? 'Currently selected.' : ''}`}
                        >
-                         {fav.address}
-                         {/* Optionally show postcode */}
-                         {/* <span className="block text-xs text-muted-foreground">{fav.postcode}</span> */}
+                         <span className={`${selectedAddress?.uprn === fav.uprn ? 'font-semibold text-primary' : 'text-foreground'}`}>
+                            {fav.address}
+                         </span>
+                         {/* Show postcode subtly */}
+                         <span className="block text-xs text-muted-foreground">{fav.postcode}</span>
                        </button>
+                         {/* Show Home icon if selected */}
+                        {selectedAddress?.uprn === fav.uprn && (
+                          <Home className="h-4 w-4 text-primary mr-2 shrink-0" />
+                        )}
                        <Button
                          variant="ghost"
                          size="icon"
-                         className="text-muted-foreground hover:text-destructive h-8 w-8 md:h-9 md:w-9" // Adjusted size
-                         onClick={() => handleDeleteFavourite(fav.uprn)}
+                         className="text-muted-foreground hover:text-destructive h-8 w-8 md:h-9 md:w-9 shrink-0" // Added shrink-0
+                         onClick={(e) => { e.stopPropagation(); handleDeleteFavourite(fav.uprn); }} // Prevent select on delete click
                          aria-label={`Remove ${fav.address} from favourites`}
                        >
                          <Trash2 className="h-4 w-4" />
@@ -152,11 +163,12 @@ export default function SettingsPage() {
         <Separator /> {/* Separator */}
 
         {/* Notifications Section */}
-        <div>
+        <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
           <h2 className="text-lg md:text-xl font-semibold mb-4 flex items-center gap-2">
              <BellRing className="h-5 w-5 text-accent" /> Notifications
            </h2>
-          <Card className="shadow-none border">
+          {/* Minimal card: no border/shadow on light, subtle border on dark */}
+          <Card className="border-transparent dark:border shadow-none bg-card">
              <CardContent className="space-y-4 pt-6">
                <div className="flex items-center justify-between">
                  <Label htmlFor="notifications-enabled" className="text-sm md:text-base flex-grow mr-4 cursor-pointer">
@@ -174,7 +186,7 @@ export default function SettingsPage() {
                {notificationsEnabled && (
                 <>
                  <Separator className="my-3" />
-                 <div className="space-y-2">
+                 <div className="space-y-2 animate-fade-in"> {/* Fade in time selection */}
                    <Label htmlFor="notification-time" className="text-sm md:text-base">Reminder Time</Label>
                    <Select
                      value={String(notificationTime)}

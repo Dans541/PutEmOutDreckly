@@ -24,23 +24,25 @@ export function Header({ showBackButton = false, backDestination }: HeaderProps)
   };
 
   return (
-    // Removed background blur and reduced height from h-14 to h-12
-    <header className="sticky top-0 z-50 w-full border-b bg-background">
-      <div className="container flex h-12 items-center justify-between px-4">
-        <div className="flex items-center space-x-1"> {/* Reduced space */}
+    // Minimalist header: No border, uses background color.
+    // Subtle bottom border in dark mode for separation if needed.
+    <header className="sticky top-0 z-50 w-full bg-background dark:border-b dark:border-border/50">
+      {/* Slightly increased height for better touch targets */}
+      <div className="container flex h-14 items-center justify-between px-4">
+        <div className="flex items-center space-x-1">
           {showBackButton && (
             <Button variant="ghost" size="icon" onClick={handleBack} aria-label="Go back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-           {/* Removed redundant aria-label */}
-           <Link href="/dashboard" className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50">
-             <Trash2 className="h-5 w-5 text-primary" /> {/* Slightly smaller icon */}
-             <span className="font-semibold text-base hidden sm:inline-block">Put 'Em Out Dreckly</span> {/* Adjusted font */}
+           <Link href="/dashboard" className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50 transition-colors">
+             <Trash2 className="h-6 w-6 text-primary" /> {/* Slightly larger icon */}
+             {/* Keep title visible on small screens for branding */}
+             <span className="font-semibold text-base sm:text-lg">Put 'Em Out Dreckly</span>
            </Link>
         </div>
 
-        <div className="flex items-center space-x-1"> {/* Reduced space */}
+        <div className="flex items-center space-x-0.5"> {/* Reduced space */}
           <Button variant="ghost" size="icon" asChild aria-label="Go to settings">
             <Link href="/settings">
               <Settings className="h-5 w-5" />
@@ -52,16 +54,13 @@ export function Header({ showBackButton = false, backDestination }: HeaderProps)
             onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
             aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
           >
-            {theme === 'light' ? (
-              <Moon className="h-5 w-5" />
-            ) : (
-              <Sun className="h-5 w-5" />
-            )}
+            {/* Use Sun/Moon icons consistently */}
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
           </Button>
         </div>
       </div>
     </header>
   );
 }
-
-    
