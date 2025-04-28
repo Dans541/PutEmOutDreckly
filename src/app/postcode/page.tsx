@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -60,16 +61,10 @@ export default function PostcodePage() {
     },
   });
 
-   // Redirect logic
-   useEffect(() => {
-     if (!addressLoading) {
-       if (selectedAddress) {
-         router.replace('/dashboard');
-       }
-       // No automatic redirect to settings if favourites exist but none selected
-     }
-   }, [addressLoading, selectedAddress, router]);
-
+   // --- Removed the useEffect causing immediate redirects ---
+   // Initial routing is handled by SplashScreen.
+   // If the user navigates here after the app has loaded,
+   // we assume it's intentional (e.g., from settings).
 
   const onSubmit: SubmitHandler<PostcodeFormData> = async (data) => {
     const searchPostcode = data.postcode;
@@ -140,9 +135,9 @@ export default function PostcodePage() {
         <div className="flex flex-col flex-grow justify-between items-center text-center animate-fade-in">
           <div className="w-full max-w-xs mx-auto">
              <PostcodeIllustration className="w-full h-auto mb-6" />
-             <h1 className="text-2xl font-semibold mb-2">Help us find your collector</h1>
+             <h1 className="text-2xl font-semibold mb-2">Where are you?</h1>
              <p className="text-muted-foreground text-sm mb-8">
-               We first need to have your postcode to retrieve your local bin collector details.
+               Enter your postcode so we can find your collection schedule.
              </p>
            </div>
 
@@ -191,10 +186,10 @@ export default function PostcodePage() {
                  {/* Button styled like BinDays */}
                 <Button
                   type="submit"
-                  disabled={isLoading || !form.formState.isValid}
+                  disabled={isLoading || !form.formState.isValid || form.getValues('postcode').length === 0}
                   className="w-full h-12 text-lg font-semibold rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
-                  {isLoading ? 'Searching...' : 'Continue'}
+                  {isLoading ? 'Searching...' : 'Search'}
                 </Button>
               </form>
             </Form>
@@ -213,7 +208,7 @@ export default function PostcodePage() {
           <div className="relative mb-4">
             <Input
                 type="text"
-                value={`Search Addresses: ${lastSearchedPostcode}`} // Display searched postcode
+                value={`Addresses for ${lastSearchedPostcode}`} // Display searched postcode
                 readOnly
                 className="h-11 text-sm border bg-secondary text-muted-foreground pl-4 pr-10" // Style like a search bar
                 aria-label="Searched Postcode"
@@ -221,7 +216,11 @@ export default function PostcodePage() {
              <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowAddressList(false)} // Go back to postcode input
+                onClick={() => {
+                    setShowAddressList(false); // Go back to postcode input
+                    setSelectedFetchedAddress(null); // Clear selection when going back
+                    // form.reset({ postcode: lastSearchedPostcode }); // Optionally reset form with last postcode
+                }}
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground"
                 aria-label="Search again"
               >
