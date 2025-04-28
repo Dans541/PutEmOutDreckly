@@ -46,22 +46,25 @@ export default function SettingsPage() {
        if (!fullAddress) return '';
        const parts = fullAddress.split(',');
        if (parts.length >= 2) {
-           const street = parts[0].trim();
-           const town = parts[1].trim(); // Assume second part is the town
+           // Take the first part (number and street), and the second part (town/locality)
+           const firstPart = parts[0]?.trim() || '';
+           const secondPart = parts[1]?.trim() || '';
 
            // Basic Title Case for display (handles all caps from API)
            const titleCase = (str: string) =>
-               str.toLowerCase().replace(/\b(\w)/g, char => char.toUpperCase());
+               str.toLowerCase().replace(/\b(\w|[0-9])/g, char => char.toUpperCase()); // Title case numbers too
 
             // Further clean town part (remove postcode if present)
-            const cleanTown = town.replace(/[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}/gi, '').trim();
+            const cleanSecondPart = secondPart.replace(/[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}/gi, '').trim();
 
-            if (street && cleanTown) {
-              return `${titleCase(street)}, ${titleCase(cleanTown)}`;
+            if (firstPart && cleanSecondPart) {
+              return `${titleCase(firstPart)}, ${titleCase(cleanSecondPart)}`;
+            } else if (firstPart) {
+                return titleCase(firstPart); // Fallback if only first part exists
             }
        }
-       // Fallback to full address if parsing fails or format is unexpected
-       return fullAddress;
+       // Fallback to full address (title-cased) if parsing fails or format is unexpected
+       return fullAddress.toLowerCase().replace(/\b(\w|[0-9])/g, char => char.toUpperCase());
    };
 
 
