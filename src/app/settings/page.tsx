@@ -46,52 +46,50 @@ export default function SettingsPage() {
    // Helper function for Title Case
    const titleCase = (str: string): string => {
        if (!str) return '';
-       return str.toLowerCase().replace(/\b(\w|[0-9])/g, char => char.toUpperCase()); // Title case words and numbers
+       // Convert to lower case and capitalize each word (including after numbers like 1st)
+       return str.toLowerCase().replace(/\b(\w|[0-9]+(?:st|nd|rd|th)?)\b/g, char => char.toUpperCase());
    };
 
    // Function to format address display: "House Number Road Name, Town/City"
-   // Revised Logic: Take first part (street) and second part (locality/town), title case.
    const formatDisplayAddress = (fullAddress: string): string => {
-       if (!fullAddress || typeof fullAddress !== 'string') return '';
+     if (!fullAddress || typeof fullAddress !== 'string') return '';
 
-       const parts = fullAddress.split(',').map(part => part.trim()).filter(part => part); // Split and remove empty parts
+     const parts = fullAddress.split(',').map(part => part.trim()).filter(part => part); // Split and remove empty parts
 
-       if (parts.length === 0) return '';
+     if (parts.length === 0) return '';
 
-       const firstPart = titleCase(parts[0]); // House Number and Road Name
+     const firstPart = titleCase(parts[0]); // House Number and Road Name (already title cased)
 
-       if (parts.length === 1) {
-           return firstPart; // Only street info available
+     let townPart = '';
+     // Iterate through parts after the first one to find the town/city
+     for (let i = 1; i < parts.length; i++) {
+       const potentialTown = parts[i];
+       // Basic checks: avoid 'Cornwall' and postcode-like strings
+       const isCounty = /cornwall/i.test(potentialTown);
+       const isPostcode = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i.test(potentialTown);
+
+       if (!isCounty && !isPostcode && potentialTown.length > 2) { // Check length to avoid fragments
+         townPart = titleCase(potentialTown);
+         break; // Found a suitable town/city part
        }
+     }
 
-       // Attempt to find a reasonable "Town/City" part. Often the second part.
-       // Avoid including things like "Cornwall" or the postcode itself.
-       let secondPart = '';
-       if (parts.length > 1) {
-           // Check if the second part looks like a county or postcode
-           const potentialTown = parts[1];
-           const isCounty = /cornwall/i.test(potentialTown);
-           const isPostcode = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i.test(potentialTown);
+     if (firstPart && townPart) {
+       return `${firstPart}, ${townPart}`;
+     } else {
+       return firstPart; // Fallback to just the first part if town isn't found
+     }
+   };
 
-           if (!isCounty && !isPostcode) {
-               secondPart = titleCase(potentialTown);
-           } else if (parts.length > 2) {
-                // If second part was county/postcode, try the third part
-                const potentialTown2 = parts[2];
-                const isCounty2 = /cornwall/i.test(potentialTown2);
-                 const isPostcode2 = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i.test(potentialTown2);
-                 if (!isCounty2 && !isPostcode2) {
-                     secondPart = titleCase(potentialTown2);
-                 }
-           }
-       }
-
-
-       if (firstPart && secondPart) {
-           return `${firstPart}, ${secondPart}`;
-       } else {
-           return firstPart; // Fallback to just the first part if a suitable second part isn't found
-       }
+   // Function to format postcode with a space
+   const formatPostcode = (postcode: string): string => {
+     if (!postcode || typeof postcode !== 'string' || postcode.length < 4) return postcode;
+     // Ensure it's uppercase and remove existing spaces
+     const cleanedPostcode = postcode.toUpperCase().replace(/\s/g, '');
+     // Insert space before the last 3 characters
+     const outward = cleanedPostcode.slice(0, -3);
+     const inward = cleanedPostcode.slice(-3);
+     return `${outward} ${inward}`;
    };
 
 
@@ -175,7 +173,7 @@ export default function SettingsPage() {
                            <span className={`block text-sm truncate ${selectedAddress?.uprn === fav.uprn ? 'font-semibold text-primary' : 'text-foreground'}`}>
                               {formatDisplayAddress(fav.address)} {/* Use formatted address */}
                            </span>
-                           <span className="block text-xs text-muted-foreground">{fav.postcode}</span>
+                           <span className="block text-xs text-muted-foreground">{formatPostcode(fav.postcode)}</span> {/* Use formatted postcode */}
                          </div>
                         </button>
                        {/* Show Check icon if selected */}
@@ -258,3 +256,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
