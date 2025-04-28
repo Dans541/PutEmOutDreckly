@@ -37,49 +37,65 @@ export default function SettingsPage() {
    // Redirect if no favourites and no selection after loading
    useEffect(() => {
      // Only redirect if loading is finished AND it's not the initial hydration
-     if (isClient && !addressLoading && favourites.length === 0 && !selectedAddress) {
+     // And not currently on the postcode page trying to get back
+     if (isClient && !addressLoading && favourites.length === 0 && !selectedAddress && window.location.pathname !== '/postcode') {
        console.log("Settings: No favourites or selected address, redirecting to postcode.");
        router.replace('/postcode');
      }
    }, [isClient, addressLoading, favourites, selectedAddress, router]);
 
-   // Helper function for Title Case
-   const titleCase = (str: string): string => {
-       if (!str) return '';
-       // Convert to lower case and capitalize each word (including after numbers like 1st)
-       return str.toLowerCase().replace(/\b(\w|[0-9]+(?:st|nd|rd|th)?)\b/g, char => char.toUpperCase());
-   };
+    // Helper function for Title Case
+    const titleCase = (str: string): string => {
+        if (!str) return '';
+        // Handle potential all-caps input from API by converting to lower first
+        return str.toLowerCase()
+          .split(' ')
+          .map(word => {
+            if (word.length > 0) {
+              // Capitalize first letter
+              return word.charAt(0).toUpperCase() + word.slice(1);
+            }
+            return '';
+          })
+          .join(' ');
+      };
+
 
    // Function to format address display: "House Number Road Name, Town/City"
-   const formatDisplayAddress = (fullAddress: string): string => {
-     if (!fullAddress || typeof fullAddress !== 'string') return '';
+    const formatDisplayAddress = (fullAddress: string): string => {
+        if (!fullAddress || typeof fullAddress !== 'string') return '';
 
-     const parts = fullAddress.split(',').map(part => part.trim()).filter(part => part); // Split and remove empty parts
+        const parts = fullAddress.split(',').map(part => part.trim()).filter(part => part);
+        if (parts.length === 0) return '';
 
-     if (parts.length === 0) return '';
+        // Remove postcode and county (case-insensitive)
+        const postcodeRegex = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i;
+        let relevantParts = parts.filter(part =>
+        !postcodeRegex.test(part) &&
+        part.toLowerCase() !== 'cornwall'
+        );
 
-     const firstPart = titleCase(parts[0]); // House Number and Road Name (already title cased)
+        if (relevantParts.length === 0) {
+            // Fallback if only postcode/county existed in original parts
+            return titleCase(parts[0]);
+        }
 
-     let townPart = '';
-     // Iterate through parts after the first one to find the town/city
-     for (let i = 1; i < parts.length; i++) {
-       const potentialTown = parts[i];
-       // Basic checks: avoid 'Cornwall' and postcode-like strings
-       const isCounty = /cornwall/i.test(potentialTown);
-       const isPostcode = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i.test(potentialTown);
+        // If only one relevant part remains, it's likely the street/building or town - return it title-cased
+        if(relevantParts.length === 1) {
+            return titleCase(relevantParts[0]);
+        }
 
-       if (!isCounty && !isPostcode && potentialTown.length > 2) { // Check length to avoid fragments
-         townPart = titleCase(potentialTown);
-         break; // Found a suitable town/city part
-       }
-     }
+        // Assume the last part of relevantParts is the town
+        const town = titleCase(relevantParts[relevantParts.length - 1]);
 
-     if (firstPart && townPart) {
-       return `${firstPart}, ${townPart}`;
-     } else {
-       return firstPart; // Fallback to just the first part if town isn't found
-     }
-   };
+        // Assume everything before the town is the street address part
+        const streetParts = relevantParts.slice(0, -1); // Get all parts except the last (town)
+
+        // Join street parts back, handling potential multiple commas correctly, then title case
+        const streetAddress = titleCase(streetParts.join(', '));
+
+        return `${streetAddress}, ${town}`;
+    };
 
    // Function to format postcode with a space
    const formatPostcode = (postcode: string): string => {
@@ -257,3 +273,5 @@ export default function SettingsPage() {
   );
 }
 
+
+    
