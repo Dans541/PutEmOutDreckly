@@ -9,12 +9,11 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      // Minimalist styling:
-      // Light mode: No border, very subtle shadow, background provides separation.
-      // Dark mode: Keep border for clarity on dark backgrounds.
-      "rounded-lg bg-card text-card-foreground",
-      "border-transparent dark:border dark:border-border", // No border light, border dark
-      "shadow-[0_1px_3px_0_rgba(0,0,0,0.02),0_1px_2px_-1px_rgba(0,0,0,0.01)] dark:shadow-none", // Very subtle shadow light, none dark
+      // Minimalist: Remove explicit background in light mode (inherits from body/parent)
+      // Keep border for structure, remove shadow
+      "rounded-lg border bg-card text-card-foreground shadow-none", // Use border, remove shadow
+      // Dark mode keeps explicit background for contrast
+      "dark:bg-card",
       className
     )}
     {...props}
@@ -28,7 +27,7 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    // Consistent padding
+    // Consistent padding, adjust as needed for BinDays look
     className={cn("flex flex-col space-y-1.5 p-4 md:p-5", className)}
     {...props}
   />
@@ -41,7 +40,7 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h3
     ref={ref}
-    // Slightly larger title
+    // Slightly larger title, match BinDays weight
     className={cn(
       "text-lg font-semibold leading-none tracking-tight md:text-xl",
       className
@@ -67,7 +66,7 @@ const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  // Consistent padding, adjust top padding based on whether header exists
+  // Consistent padding, maybe remove top padding if header exists
   <div ref={ref} className={cn("p-4 md:p-5 pt-0", className)} {...props} />
 ))
 CardContent.displayName = "CardContent"

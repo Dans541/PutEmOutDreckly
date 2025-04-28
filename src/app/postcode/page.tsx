@@ -17,19 +17,12 @@ import {
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
-  FormMessage,
+  FormMessage, // Removed FormLabel
 } from '@/components/ui/form';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, Home, Trash2 } from 'lucide-react'; // Ensure Trash2 is imported
+import { Loader2, Search, MapPin, Check } from 'lucide-react'; // Changed icons
 import { useToast } from '@/hooks/use-toast';
+import { PostcodeIllustration } from '@/components/postcode-illustration'; // Import the illustration
 
 // Adjusted regex for better flexibility with spacing
 const postcodeSchema = z.object({
@@ -51,9 +44,9 @@ type FetchedAddress = Omit<Address, 'postcode'>;
 
 export default function PostcodePage() {
   const [addresses, setAddresses] = useState<FetchedAddress[]>([]);
-   // State to hold the selected address (without postcode initially)
   const [selectedFetchedAddress, setSelectedFetchedAddress] = useState<FetchedAddress | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // For confirm button loading
   const [showAddressList, setShowAddressList] = useState(false);
   const [lastSearchedPostcode, setLastSearchedPostcode] = useState<string>(''); // Store the searched postcode
   const { setAddress, addFavourite, favourites, loading: addressLoading, selectedAddress } = useAddress();
@@ -67,34 +60,31 @@ export default function PostcodePage() {
     },
   });
 
-   // Redirect logic remains similar, checking context state after loading
+   // Redirect logic
    useEffect(() => {
      if (!addressLoading) {
        if (selectedAddress) {
          router.replace('/dashboard');
-       } else if (favourites.length > 0 && window.location.pathname !== '/settings') {
-         // Only redirect if not already going to settings
-         // router.replace('/settings'); - Decided against auto-redirect to settings
        }
+       // No automatic redirect to settings if favourites exist but none selected
      }
-   }, [addressLoading, selectedAddress, favourites, router]);
+   }, [addressLoading, selectedAddress, router]);
 
 
   const onSubmit: SubmitHandler<PostcodeFormData> = async (data) => {
-    const searchPostcode = data.postcode; // Normalized postcode from schema transform
-    setLastSearchedPostcode(searchPostcode); // Store the postcode used for this search
+    const searchPostcode = data.postcode;
+    setLastSearchedPostcode(searchPostcode);
     setIsLoading(true);
     setShowAddressList(false);
-    setSelectedFetchedAddress(null); // Reset selection
-    setAddresses([]); // Clear previous results
+    setSelectedFetchedAddress(null);
+    setAddresses([]);
 
     try {
       const fetchedAddresses = await getAddressesByPostcode(searchPostcode);
 
       if (fetchedAddresses.length > 0) {
         setAddresses(fetchedAddresses);
-        setShowAddressList(true); // Show list immediately
-        // Blur input
+        setShowAddressList(true);
         const postcodeField = document.getElementById('postcode');
         if (postcodeField instanceof HTMLInputElement) {
            postcodeField.blur();
@@ -119,19 +109,24 @@ export default function PostcodePage() {
   };
 
   const handleConfirmSelection = () => {
+     setIsSubmitting(true); // Indicate loading on confirm button
      if (selectedFetchedAddress && lastSearchedPostcode) {
-        // Create the full Address object including the postcode
         const fullAddress: Address = {
             ...selectedFetchedAddress,
             postcode: lastSearchedPostcode,
         };
-      setAddress(fullAddress); // Set the complete address in context
-      addFavourite(fullAddress); // Favourite the complete address
-      router.push('/dashboard');
+        setAddress(fullAddress);
+        addFavourite(fullAddress);
+        // Delay slightly to show loading feedback
+        setTimeout(() => {
+            router.push('/dashboard');
+            // No need to setIsSubmitting(false) as we navigate away
+        }, 300);
     } else {
+      setIsSubmitting(false); // Stop loading if selection is invalid
       toast({
         title: 'Selection Incomplete',
-        description: 'Please select an address and ensure a postcode was searched.',
+        description: 'Please select an address first.',
         variant: 'destructive',
       });
     }
@@ -139,107 +134,138 @@ export default function PostcodePage() {
 
 
   return (
-    // Use background for the container
-    <div className="flex flex-col items-center justify-center p-4 h-full bg-background">
-       <div className="flex items-center mb-6 text-center pt-10 animate-fade-in">
-         <Trash2 className="h-9 w-9 text-primary mr-2" /> {/* Use a relevant icon */}
-         <h1 className="text-2xl md:text-3xl font-bold">Put 'Em Out Dreckly</h1>
-       </div>
-       {/* Minimal card: no border/shadow on light, subtle border on dark */}
-      <Card className="w-full max-w-md border-none shadow-none bg-transparent md:bg-card md:dark:border animate-fade-in" style={{ animationDelay: '0.2s' }}>
-        <CardHeader>
-          <CardTitle className="text-xl md:text-2xl text-center">Find Your Collections</CardTitle>
-          <CardDescription className="text-center text-sm">
-            Enter your Cornwall postcode below.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="postcode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="sr-only">Postcode</FormLabel> {/* Hide label visually */}
-                    <div className="flex items-center space-x-2">
-                      <FormControl>
-                        <Input
-                          id="postcode"
-                          placeholder="Enter postcode..." // Simpler placeholder
-                          {...field}
-                           // Use field.value which might be different from form.getValues if transform runs late
-                          value={field.value || ''} // Controlled component
-                          onChange={(e) => field.onChange(e.target.value.toUpperCase())} // Uppercase on input
-                          className="flex-grow text-base" // Ensure readable text size
-                          aria-label="Postcode" // Add aria-label since visual label is hidden
-                          aria-describedby="postcode-error"
-                          aria-invalid={!!form.formState.errors.postcode}
-                          autoCapitalize="characters"
-                          inputMode="text"
-                          autoComplete="postal-code"
-                        />
-                      </FormControl>
-                      <Button type="submit" disabled={isLoading} size="icon" aria-label="Search postcode">
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Search className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                    <FormMessage id="postcode-error" />
-                  </FormItem>
-                )}
-              />
-            </form>
-          </Form>
+    <div className="flex flex-col h-full bg-background p-4 pt-8 md:pt-12">
+      {!showAddressList ? (
+        // Initial Postcode Entry View
+        <div className="flex flex-col flex-grow justify-between items-center text-center animate-fade-in">
+          <div className="w-full max-w-xs mx-auto">
+             <PostcodeIllustration className="w-full h-auto mb-6" />
+             <h1 className="text-2xl font-semibold mb-2">Help us find your collector</h1>
+             <p className="text-muted-foreground text-sm mb-8">
+               We first need to have your postcode to retrieve your local bin collector details.
+             </p>
+           </div>
 
-          {showAddressList && addresses.length > 0 && (
-             // Add animation to the address list container
-            <div className="mt-5 animate-fade-in" style={{ animationDelay: '0.3s' }}>
-              <h3 className="text-base md:text-lg font-medium mb-2 flex items-center gap-2"> {/* Changed font-semibold to medium */}
-                <Home className="h-4 w-4 text-muted-foreground" /> Select Your Address:
-              </h3>
-               {/* Lighter background for scroll area in light mode */}
-              <ScrollArea className="h-52 md:h-60 w-full rounded-md border bg-white dark:bg-background">
-                <div className="p-1 space-y-1">
-                  {addresses.map((addr) => (
-                    <Button
-                      key={addr.uprn}
-                       // Use primary variant for selected, ghost for others
-                      variant={selectedFetchedAddress?.uprn === addr.uprn ? 'default' : 'ghost'}
-                      className={`w-full text-left justify-start h-auto py-2.5 px-3 whitespace-normal text-sm leading-snug ${
-                        selectedFetchedAddress?.uprn === addr.uprn
-                          ? 'bg-primary/10 text-primary font-semibold' // Highlight selected
-                          : 'hover:bg-muted/50'
-                      }`}
-                      onClick={() => setSelectedFetchedAddress(addr)} // Select the FetchedAddress
-                      aria-pressed={selectedFetchedAddress?.uprn === addr.uprn}
-                    >
-                      {addr.address}
-                    </Button>
-                  ))}
-                </div>
-              </ScrollArea>
-              <Button
-                onClick={handleConfirmSelection}
-                disabled={!selectedFetchedAddress || isLoading}
-                 // Use primary variant for confirm button
-                className="w-full mt-4"
+          <div className="w-full max-w-md mb-4">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="postcode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                         {/* Input styled like BinDays */}
+                         <div className="relative">
+                           <Input
+                             id="postcode"
+                             placeholder="Postcode"
+                             {...field}
+                             value={field.value || ''}
+                             onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                             className="h-12 text-center text-lg border-2 focus:border-primary focus:ring-0" // Adjusted styling
+                             aria-label="Postcode"
+                             aria-describedby="postcode-error"
+                             aria-invalid={!!form.formState.errors.postcode}
+                             autoCapitalize="characters"
+                             inputMode="text"
+                             autoComplete="postal-code"
+                             disabled={isLoading}
+                           />
+                            {/* Conditionally render Search or Loader inside input */}
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              {isLoading ? (
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                              ) : (
+                                // Search icon only appears if not loading
+                                <Search className="h-5 w-5 text-muted-foreground" />
+                              )}
+                            </div>
+                         </div>
+
+                      </FormControl>
+                      <FormMessage id="postcode-error" className="text-center" />
+                    </FormItem>
+                  )}
+                />
+                 {/* Button styled like BinDays */}
+                <Button
+                  type="submit"
+                  disabled={isLoading || !form.formState.isValid}
+                  className="w-full h-12 text-lg font-semibold rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  {isLoading ? 'Searching...' : 'Continue'}
+                </Button>
+              </form>
+            </Form>
+             {/* Link to favourites/settings if available */}
+             {!addressLoading && favourites.length > 0 && (
+                <Button variant="link" onClick={() => router.push('/settings')} className="mt-4 text-sm text-primary">
+                View Saved Addresses
+                </Button>
+             )}
+          </div>
+        </div>
+      ) : (
+        // Address Selection View
+        <div className="flex flex-col flex-grow h-full animate-fade-in">
+           {/* Search Bar imitation */}
+          <div className="relative mb-4">
+            <Input
+                type="text"
+                value={`Search Addresses: ${lastSearchedPostcode}`} // Display searched postcode
+                readOnly
+                className="h-11 text-sm border bg-secondary text-muted-foreground pl-4 pr-10" // Style like a search bar
+                aria-label="Searched Postcode"
+            />
+             <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowAddressList(false)} // Go back to postcode input
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground"
+                aria-label="Search again"
               >
-                Confirm Selection
-              </Button>
+                 <Search className="h-4 w-4" /> {/* Or use a Back/Edit icon */}
+               </Button>
+          </div>
+
+
+          <ScrollArea className="flex-grow mb-4 border-t border-b -mx-4 px-4"> {/* Make scroll area take space */}
+            <div className="py-2">
+              {addresses.map((addr) => (
+                <button
+                  key={addr.uprn}
+                  className={`w-full text-left py-3 px-1 flex items-center gap-3 border-b last:border-b-0 ${
+                    selectedFetchedAddress?.uprn === addr.uprn ? 'font-semibold text-primary' : 'text-foreground hover:bg-muted/50'
+                  }`}
+                  onClick={() => setSelectedFetchedAddress(addr)}
+                  aria-pressed={selectedFetchedAddress?.uprn === addr.uprn}
+                >
+                   {/* Icon changes color based on selection */}
+                  <MapPin className={`h-5 w-5 shrink-0 ${selectedFetchedAddress?.uprn === addr.uprn ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className="flex-grow">{addr.address}</span>
+                   {/* "Selected" text aligned right */}
+                  {selectedFetchedAddress?.uprn === addr.uprn && (
+                    <span className="text-primary text-sm ml-auto mr-1 flex items-center gap-1">
+                      <Check className="h-4 w-4" /> Selected
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
-          )}
-        </CardContent>
-      </Card>
-       {/* Link to settings if favourites exist and none selected */}
-        {!addressLoading && favourites.length > 0 && !selectedAddress && (
-         <Button variant="link" onClick={() => router.push('/settings')} className="mt-5 text-sm animate-fade-in" style={{ animationDelay: '0.4s' }}>
-           Go to Favourites
-         </Button>
-       )}
+          </ScrollArea>
+
+          <div className="mt-auto mb-4"> {/* Button at the bottom */}
+             <Button
+               onClick={handleConfirmSelection}
+               disabled={!selectedFetchedAddress || isSubmitting}
+               className="w-full h-12 text-lg font-semibold rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+             >
+               {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirm Selection'}
+             </Button>
+           </div>
+        </div>
+      )}
     </div>
   );
 }
