@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,6 +12,7 @@ import { Header } from '@/components/header'; // Use the existing header
 import { BinIcon } from '@/components/bin-icon'; // Use the BinIcon component
 import { DashboardIllustration } from '@/components/dashboard-illustration'; // Import illustration
 import { AlertCircle, RefreshCw } from 'lucide-react'; // Icons for error/retry
+import { Button } from '@/components/ui/button'; // Import button for Retry
 
 // Extend BinCollectionData to include the bin type for mapping
 interface CollectionEntry {
@@ -91,10 +93,8 @@ export default function DashboardPage() {
     if (daysDiff < 0) return 'Past'; // Should ideally not happen with future dates
     if (daysDiff === 0) return 'Today';
     if (daysDiff === 1) return 'Tomorrow';
-    if (daysDiff <= 7) return `In ${daysDiff} days`;
-    // For dates further out, maybe just show the date or a week count
-    // return formatRelative(collectionDate, today).split(' at')[0]; // e.g. "next Monday" - might be too verbose
-    return `${daysDiff} Days`; // Match BinDays format
+    // Now use "In X Days" for all future dates > 1 day
+    return `In ${daysDiff} days`;
   };
 
   // Prepare sorted collection entries
@@ -115,11 +115,7 @@ export default function DashboardPage() {
   const renderSkeleton = () => (
     <div className="flex flex-col flex-grow p-4 md:p-6 space-y-4 animate-pulse">
       {/* Header Skeleton */}
-      <div className="flex items-center justify-between mb-4">
-        <Skeleton className="h-5 w-8 rounded" /> {/* Hamburger */}
-        <Skeleton className="h-5 w-40 rounded" /> {/* Address */}
-        <Skeleton className="h-5 w-5 rounded-full" /> {/* Theme/Settings */}
-      </div>
+      {/* Removed as Header component handles its own loading state */}
        {/* Illustration Placeholder */}
       <div className="flex justify-center items-center h-32 mb-4">
          <Skeleton className="h-24 w-48 rounded-lg" />
@@ -145,10 +141,6 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
-       {/* Error/Retry Skeleton (optional, shown if error is possible) */}
-       {/* <div className="mt-6 text-center">
-         <Skeleton className="h-10 w-32 mx-auto" />
-       </div> */}
     </div>
   );
 
@@ -240,3 +232,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
