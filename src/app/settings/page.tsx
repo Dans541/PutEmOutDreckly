@@ -43,40 +43,55 @@ export default function SettingsPage() {
      }
    }, [isClient, addressLoading, favourites, selectedAddress, router]);
 
+   // Helper function for Title Case
+   const titleCase = (str: string): string => {
+       if (!str) return '';
+       return str.toLowerCase().replace(/\b(\w|[0-9])/g, char => char.toUpperCase()); // Title case words and numbers
+   };
+
    // Function to format address display: "House Number Road Name, Town/City"
+   // Revised Logic: Take first part (street) and second part (locality/town), title case.
    const formatDisplayAddress = (fullAddress: string): string => {
        if (!fullAddress || typeof fullAddress !== 'string') return '';
 
-       const parts = fullAddress.split(',').map(part => part.trim());
+       const parts = fullAddress.split(',').map(part => part.trim()).filter(part => part); // Split and remove empty parts
 
-        // Basic Title Case for display (handles all caps from API)
-       const titleCase = (str: string) =>
-           str.toLowerCase().replace(/\b(\w|[0-9])/g, char => char.toUpperCase()); // Title case numbers too
+       if (parts.length === 0) return '';
 
-       if (parts.length >= 2) {
-           const firstPart = titleCase(parts[0]); // House Number and Road Name
-           // Clean the second part (town/city) - remove county/postcode if present
-           let secondPart = parts[1];
-           // Remove common county names (case-insensitive)
-           secondPart = secondPart.replace(/,\s*Cornwall/i, '').trim();
-           // Remove UK postcode pattern (case-insensitive)
-           secondPart = secondPart.replace(/[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}/gi, '').trim();
-            // Remove trailing commas if any resulted from replacements
-           secondPart = secondPart.replace(/,$/, '').trim();
+       const firstPart = titleCase(parts[0]); // House Number and Road Name
 
-           const cleanSecondPart = titleCase(secondPart);
-
-           if (firstPart && cleanSecondPart) {
-             return `${firstPart}, ${cleanSecondPart}`;
-           } else if (firstPart) {
-               return firstPart; // Fallback if only first part is useful
-           }
-       } else if (parts.length === 1) {
-           // If only one part, return it title-cased (might be just street or building)
-            return titleCase(parts[0]);
+       if (parts.length === 1) {
+           return firstPart; // Only street info available
        }
-       // Fallback to original (title-cased) if parsing fails
-       return titleCase(fullAddress);
+
+       // Attempt to find a reasonable "Town/City" part. Often the second part.
+       // Avoid including things like "Cornwall" or the postcode itself.
+       let secondPart = '';
+       if (parts.length > 1) {
+           // Check if the second part looks like a county or postcode
+           const potentialTown = parts[1];
+           const isCounty = /cornwall/i.test(potentialTown);
+           const isPostcode = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i.test(potentialTown);
+
+           if (!isCounty && !isPostcode) {
+               secondPart = titleCase(potentialTown);
+           } else if (parts.length > 2) {
+                // If second part was county/postcode, try the third part
+                const potentialTown2 = parts[2];
+                const isCounty2 = /cornwall/i.test(potentialTown2);
+                 const isPostcode2 = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i.test(potentialTown2);
+                 if (!isCounty2 && !isPostcode2) {
+                     secondPart = titleCase(potentialTown2);
+                 }
+           }
+       }
+
+
+       if (firstPart && secondPart) {
+           return `${firstPart}, ${secondPart}`;
+       } else {
+           return firstPart; // Fallback to just the first part if a suitable second part isn't found
+       }
    };
 
 
