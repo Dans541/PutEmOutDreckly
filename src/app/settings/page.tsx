@@ -36,35 +36,47 @@ export default function SettingsPage() {
 
    // Redirect if no favourites and no selection after loading
    useEffect(() => {
-     if (!addressLoading && favourites.length === 0 && !selectedAddress) {
+     // Only redirect if loading is finished AND it's not the initial hydration
+     if (isClient && !addressLoading && favourites.length === 0 && !selectedAddress) {
+       console.log("Settings: No favourites or selected address, redirecting to postcode.");
        router.replace('/postcode');
      }
-   }, [addressLoading, favourites, selectedAddress, router]);
+   }, [isClient, addressLoading, favourites, selectedAddress, router]);
 
-   // Function to format address display
+   // Function to format address display: "House Number Road Name, Town/City"
    const formatDisplayAddress = (fullAddress: string): string => {
-       if (!fullAddress) return '';
-       const parts = fullAddress.split(',');
+       if (!fullAddress || typeof fullAddress !== 'string') return '';
+
+       const parts = fullAddress.split(',').map(part => part.trim());
+
+        // Basic Title Case for display (handles all caps from API)
+       const titleCase = (str: string) =>
+           str.toLowerCase().replace(/\b(\w|[0-9])/g, char => char.toUpperCase()); // Title case numbers too
+
        if (parts.length >= 2) {
-           // Take the first part (number and street), and the second part (town/locality)
-           const firstPart = parts[0]?.trim() || '';
-           const secondPart = parts[1]?.trim() || '';
+           const firstPart = titleCase(parts[0]); // House Number and Road Name
+           // Clean the second part (town/city) - remove county/postcode if present
+           let secondPart = parts[1];
+           // Remove common county names (case-insensitive)
+           secondPart = secondPart.replace(/,\s*Cornwall/i, '').trim();
+           // Remove UK postcode pattern (case-insensitive)
+           secondPart = secondPart.replace(/[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}/gi, '').trim();
+            // Remove trailing commas if any resulted from replacements
+           secondPart = secondPart.replace(/,$/, '').trim();
 
-           // Basic Title Case for display (handles all caps from API)
-           const titleCase = (str: string) =>
-               str.toLowerCase().replace(/\b(\w|[0-9])/g, char => char.toUpperCase()); // Title case numbers too
+           const cleanSecondPart = titleCase(secondPart);
 
-            // Further clean town part (remove postcode if present)
-            const cleanSecondPart = secondPart.replace(/[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}/gi, '').trim();
-
-            if (firstPart && cleanSecondPart) {
-              return `${titleCase(firstPart)}, ${titleCase(cleanSecondPart)}`;
-            } else if (firstPart) {
-                return titleCase(firstPart); // Fallback if only first part exists
-            }
+           if (firstPart && cleanSecondPart) {
+             return `${firstPart}, ${cleanSecondPart}`;
+           } else if (firstPart) {
+               return firstPart; // Fallback if only first part is useful
+           }
+       } else if (parts.length === 1) {
+           // If only one part, return it title-cased (might be just street or building)
+            return titleCase(parts[0]);
        }
-       // Fallback to full address (title-cased) if parsing fails or format is unexpected
-       return fullAddress.toLowerCase().replace(/\b(\w|[0-9])/g, char => char.toUpperCase());
+       // Fallback to original (title-cased) if parsing fails
+       return titleCase(fullAddress);
    };
 
 
@@ -144,8 +156,8 @@ export default function SettingsPage() {
                          aria-label={`Select address: ${formatDisplayAddress(fav.address)}. ${selectedAddress?.uprn === fav.uprn ? 'Currently selected.' : ''}`}
                        >
                           <MapPin className={`h-5 w-5 shrink-0 ${selectedAddress?.uprn === fav.uprn ? 'text-primary' : 'text-muted-foreground'}`} />
-                          <div className="flex-grow">
-                           <span className={`text-sm ${selectedAddress?.uprn === fav.uprn ? 'font-semibold text-primary' : 'text-foreground'}`}>
+                          <div className="flex-grow min-w-0"> {/* Added min-w-0 for proper truncation */}
+                           <span className={`block text-sm truncate ${selectedAddress?.uprn === fav.uprn ? 'font-semibold text-primary' : 'text-foreground'}`}>
                               {formatDisplayAddress(fav.address)} {/* Use formatted address */}
                            </span>
                            <span className="block text-xs text-muted-foreground">{fav.postcode}</span>
@@ -231,5 +243,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
