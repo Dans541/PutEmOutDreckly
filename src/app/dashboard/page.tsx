@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -68,6 +69,22 @@ export default function DashboardPage() {
   // Function to calculate animation delay
   const getAnimationDelay = (index: number) => `${index * 0.1}s`;
 
+  const renderSkeletonCard = (index: number) => (
+     // Mimic Card structure with padding and spacing for a nicer look
+    <div
+      key={index}
+      className="rounded-lg border border-border bg-card p-4 space-y-3 animate-pulse"
+      style={{ animationDelay: getAnimationDelay(index) }} // Apply delay here too
+    >
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-4 w-1/3" /> {/* Title placeholder */}
+        <Skeleton className="h-5 w-5 rounded-full" /> {/* Icon placeholder */}
+      </div>
+      <Skeleton className="h-6 w-3/4" /> {/* Date placeholder */}
+    </div>
+  );
+
+
   return (
     // Use background for the whole page container
     <div className="flex flex-col h-full bg-background">
@@ -83,11 +100,9 @@ export default function DashboardPage() {
          </div>
 
         {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-              {/* Consistent skeleton styling */}
-              <Skeleton className="h-32 md:h-36 rounded-lg" />
-              <Skeleton className="h-32 md:h-36 rounded-lg" />
-              <Skeleton className="h-32 md:h-36 rounded-lg" />
+            // Responsive grid: 1 col default, 2 cols on sm+, 3 cols on lg+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {Array.from({ length: 3 }).map((_, index) => renderSkeletonCard(index))}
             </div>
           ) : error ? (
              <Card className="border-destructive bg-destructive/10 animate-fade-in">
@@ -100,7 +115,8 @@ export default function DashboardPage() {
                </CardContent>
              </Card>
           ) : binData ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+             // Use the same responsive grid for the actual cards
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {/* General Waste (Rubbish) */}
               <Card
                 className="animate-slide-up"
@@ -161,3 +177,5 @@ export default function DashboardPage() {
       </div>
   );
 }
+
+    
