@@ -24,21 +24,23 @@ export function Header({ showBackButton = false, backDestination }: HeaderProps)
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center justify-between px-4">
-        <div className="flex items-center space-x-2">
+    // Removed background blur and reduced height from h-14 to h-12
+    <header className="sticky top-0 z-50 w-full border-b bg-background">
+      <div className="container flex h-12 items-center justify-between px-4">
+        <div className="flex items-center space-x-1"> {/* Reduced space */}
           {showBackButton && (
             <Button variant="ghost" size="icon" onClick={handleBack} aria-label="Go back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
-           <Link href="/dashboard" className="flex items-center space-x-2" aria-label="Go to dashboard">
-             <Trash2 className="h-6 w-6 text-primary" />
-             <span className="font-bold hidden sm:inline-block">Put 'Em Out Dreckly</span>
+           {/* Removed redundant aria-label */}
+           <Link href="/dashboard" className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50">
+             <Trash2 className="h-5 w-5 text-primary" /> {/* Slightly smaller icon */}
+             <span className="font-semibold text-base hidden sm:inline-block">Put 'Em Out Dreckly</span> {/* Adjusted font */}
            </Link>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1"> {/* Reduced space */}
           <Button variant="ghost" size="icon" asChild aria-label="Go to settings">
             <Link href="/settings">
               <Settings className="h-5 w-5" />
@@ -61,3 +63,5 @@ export function Header({ showBackButton = false, backDestination }: HeaderProps)
     </header>
   );
 }
+
+    

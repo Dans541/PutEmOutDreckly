@@ -26,6 +26,8 @@ export default function DashboardPage() {
 
     // If no address is selected after loading, redirect to postcode entry.
     if (!selectedAddress) {
+      // Check if there are favourites, if so redirect to settings, otherwise postcode
+      // This logic is handled by the context loading now. If no selectedAddress, go to postcode.
       router.replace('/postcode'); // Use replace to prevent going back to dashboard without address
       return;
     }
@@ -50,6 +52,7 @@ export default function DashboardPage() {
   const formatDate = (date: Date | null): string => {
     if (!date) return 'N/A';
     try {
+      // Format date without year for minimalism if desired, but keeping year for clarity
       return format(date, 'EEEE, do MMMM yyyy');
     } catch (error) {
       console.error('Error formatting date:', error, date);
@@ -58,56 +61,61 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-secondary dark:bg-secondary/50">
+    <div className="flex flex-col h-full bg-secondary dark:bg-background">
       <Header showBackButton={false} />
       <div className="flex-grow p-4 md:p-6 space-y-6">
-        <h1 className="text-3xl font-bold text-center">Your Bin Collections</h1>
-         {selectedAddress && (
-           <p className="text-center text-muted-foreground mb-6">
-             Showing collections for: {selectedAddress.address}
-           </p>
-         )}
+        <div className="text-center mb-8"> {/* Increased bottom margin */}
+          <h1 className="text-3xl font-bold">Your Bin Collections</h1>
+           {selectedAddress && (
+             <p className="text-muted-foreground mt-2">
+               Showing collections for: {selectedAddress.address}
+             </p>
+           )}
+         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           {isLoading ? (
             <>
-              <Skeleton className="h-40 rounded-lg" />
-              <Skeleton className="h-40 rounded-lg" />
-              <Skeleton className="h-40 rounded-lg" />
+              <Skeleton className="h-32 rounded-lg" />
+              <Skeleton className="h-32 rounded-lg" />
+              <Skeleton className="h-32 rounded-lg" />
             </>
           ) : binData ? (
             <>
-              <Card className="shadow-md hover:shadow-lg transition-shadow">
+              {/* Removed shadow-md and hover:shadow-lg */}
+              <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-lg font-medium">General Waste</CardTitle>
-                  <Trash2 className="h-6 w-6 text-muted-foreground" />
+                  <CardTitle className="text-base font-medium">General Waste</CardTitle>
+                  <Trash2 className="h-5 w-5 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-xl font-semibold">
                     {formatDate(binData.generalWaste)}
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="shadow-md hover:shadow-lg transition-shadow">
+              {/* Removed shadow-md and hover:shadow-lg */}
+              <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-lg font-medium">Recycling</CardTitle>
-                  <Recycle className="h-6 w-6 text-primary" />
+                  <CardTitle className="text-base font-medium">Recycling</CardTitle>
+                  <Recycle className="h-5 w-5 text-primary" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-xl font-semibold">
                     {formatDate(binData.recycling)}
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="shadow-md hover:shadow-lg transition-shadow">
+              {/* Removed shadow-md and hover:shadow-lg */}
+              <Card>
                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                   <CardTitle className="text-lg font-medium">Garden Waste</CardTitle>
-                   <Leaf className="h-6 w-6 text-green-600" />
+                   <CardTitle className="text-base font-medium">Garden Waste</CardTitle>
+                   <Leaf className="h-5 w-5 text-green-600" />
                  </CardHeader>
                  <CardContent>
-                   <div className="text-2xl font-bold">
+                   <div className="text-xl font-semibold">
                      {binData.gardenWaste ? formatDate(binData.gardenWaste) : 'Not Subscribed'}
                    </div>
                  </CardContent>
@@ -123,3 +131,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

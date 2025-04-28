@@ -47,10 +47,10 @@ type PostcodeFormData = z.infer<typeof postcodeSchema>;
 
 export default function PostcodePage() {
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null); // Renamed state setter
   const [isLoading, setIsLoading] = useState(false);
   const [showAddressList, setShowAddressList] = useState(false);
-  const { setAddress, addFavourite } = useAddress();
+  const { setAddress, addFavourite, favourites, loading: addressLoading } = useAddress(); // Get favourites and loading state
   const router = useRouter();
   const { toast } = useToast();
 
@@ -61,10 +61,23 @@ export default function PostcodePage() {
     },
   });
 
+   // Redirect if address/favourites exist on load
+   useEffect(() => {
+     if (!addressLoading) { // Only redirect after loading localStorage state
+       if (selectedAddress) {
+         router.replace('/dashboard');
+       } else if (favourites.length > 0) {
+         router.replace('/settings'); // Go to settings if favourites exist but none selected
+       }
+       // If neither selectedAddress nor favourites exist, stay on postcode page
+     }
+   }, [addressLoading, selectedAddress, favourites, router]);
+
+
   const onSubmit: SubmitHandler<PostcodeFormData> = async (data) => {
     setIsLoading(true);
     setShowAddressList(false); // Hide list initially on new search
-    setSelectedAddress(null); // Reset selection
+    setSelectedAddressState(null); // Reset selection
     try {
       const fetchedAddresses = await getAddressesByPostcode(data.postcode.toUpperCase());
       if (fetchedAddresses.length > 0) {
@@ -76,6 +89,7 @@ export default function PostcodePage() {
            postcodeField.blur();
         }
       } else {
+        setAddresses([]); // Clear addresses if none found
         toast({
           title: 'No Addresses Found',
           description: 'Please check the postcode and try again.',
@@ -113,7 +127,8 @@ export default function PostcodePage() {
     const postcodeField = document.getElementById('postcode');
     const handleFocus = () => {
         if (showAddressList) {
-            setShowAddressList(false);
+            // Keep address list visible on focus for easier correction
+            // setShowAddressList(false);
         }
     };
     if (postcodeField) {
@@ -128,13 +143,19 @@ export default function PostcodePage() {
 
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 pt-0 h-full bg-secondary dark:bg-secondary/50">
-      <Header showBackButton={false} />
-      <Card className="w-full max-w-md shadow-lg">
+    <div className="flex flex-col items-center justify-center p-4 pt-0 h-full bg-secondary dark:bg-background">
+       {/* Header removed as it's not needed on the initial postcode entry page */}
+       {/* <Header showBackButton={false} /> */}
+       <div className="flex items-center mb-8 text-center">
+         <Trash2 className="h-10 w-10 text-primary mr-3" />
+         <h1 className="text-3xl font-bold">Put 'Em Out Dreckly</h1>
+       </div>
+      {/* Removed shadow-lg */}
+      <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl text-center">Find Your Address</CardTitle>
           <CardDescription className="text-center">
-            Enter your postcode to find your bin collection schedule.
+            Enter your Cornwall postcode to find your bin collection schedule.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -155,6 +176,8 @@ export default function PostcodePage() {
                           className="flex-grow"
                           aria-describedby="postcode-error"
                           aria-invalid={!!form.formState.errors.postcode}
+                          autoCapitalize="characters" // Helps with postcode entry
+                          inputMode="text" // Standard keyboard
                         />
                       </FormControl>
                       <Button type="submit" disabled={isLoading} size="icon" aria-label="Search postcode">
@@ -175,14 +198,16 @@ export default function PostcodePage() {
           {showAddressList && addresses.length > 0 && (
             <div className="mt-6">
               <h3 className="text-lg font-semibold mb-2">Select Your Address:</h3>
-              <ScrollArea className="h-60 w-full rounded-md border">
+              <ScrollArea className="h-60 w-full rounded-md border bg-background"> {/* Ensure background for scroll area */}
                 <div className="p-4 space-y-2">
                   {addresses.map((addr) => (
                     <Button
                       key={addr.uprn}
                       variant={selectedAddress?.uprn === addr.uprn ? 'default' : 'outline'}
-                      className={`w-full text-left justify-start h-auto py-2 whitespace-normal ${selectedAddress?.uprn === addr.uprn ? 'bg-primary text-primary-foreground' : ''}`}
-                      onClick={() => setSelectedAddress(addr)}
+                      className={`w-full text-left justify-start h-auto py-2 whitespace-normal ${
+                        selectedAddress?.uprn === addr.uprn ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted/50' // Adjusted non-selected style
+                      }`}
+                      onClick={() => setSelectedAddressState(addr)} // Use renamed setter
                       aria-pressed={selectedAddress?.uprn === addr.uprn}
                     >
                       {addr.address}
@@ -201,6 +226,14 @@ export default function PostcodePage() {
           )}
         </CardContent>
       </Card>
+       {/* Link to settings if favourites exist */}
+        {!addressLoading && favourites.length > 0 && !selectedAddress && (
+         <Button variant="link" onClick={() => router.push('/settings')} className="mt-6">
+           Go to Favourites
+         </Button>
+       )}
     </div>
   );
 }
+
+    

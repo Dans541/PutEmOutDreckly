@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { type Address } from '@/services/cornwall-council-api';
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 interface AddressContextType {
   selectedAddress: Address | null;
@@ -29,18 +30,24 @@ export function AddressProvider({ children }: { children: ReactNode }) {
   const [notificationTime, setNotificationTimeState] = useState<number>(18); // Default to 6 PM
   const [notificationsEnabled, setNotificationsEnabledState] = useState<boolean>(true); // Default to true
   const [loading, setLoading] = useState(true); // Start loading
+  const router = useRouter(); // Initialize router
 
   // Load initial state from localStorage
   useEffect(() => {
+    let initialAddress: Address | null = null;
+    let initialFavourites: Address[] = [];
+
     try {
       const storedAddress = localStorage.getItem(SELECTED_ADDRESS_KEY);
       if (storedAddress) {
-        setSelectedAddressState(JSON.parse(storedAddress));
+        initialAddress = JSON.parse(storedAddress);
+        setSelectedAddressState(initialAddress);
       }
 
       const storedFavourites = localStorage.getItem(FAVOURITES_KEY);
       if (storedFavourites) {
-        setFavouritesState(JSON.parse(storedFavourites));
+        initialFavourites = JSON.parse(storedFavourites);
+        setFavouritesState(initialFavourites);
       }
 
       const storedTime = localStorage.getItem(NOTIFICATION_TIME_KEY);
@@ -70,10 +77,20 @@ export function AddressProvider({ children }: { children: ReactNode }) {
       setFavouritesState([]);
       setNotificationTimeState(18);
       setNotificationsEnabledState(true);
+      initialAddress = null; // Reset initial values too
+      initialFavourites = [];
     } finally {
       setLoading(false); // Finished loading
+      // --- Initial Redirect Logic ---
+      // Check *after* loading is complete and state is set
+      // This check needs to happen outside the main flow if possible,
+      // perhaps in the SplashScreen or initial page load logic.
+      // Keeping it here might cause issues if the component unmounts/remounts.
+      // Moved this logic to SplashScreen and PostcodePage useEffects
+      // -----------------------------
     }
-  }, []);
+  }, []); // Run only once on mount
+
 
   // Update localStorage whenever state changes
   useEffect(() => {
@@ -131,27 +148,62 @@ export function AddressProvider({ children }: { children: ReactNode }) {
       if (prev.some(fav => fav.uprn === address.uprn)) {
         return prev;
       }
-      return [...prev, address];
+      const updatedFavourites = [...prev, address];
+       try {
+         localStorage.setItem(FAVOURITES_KEY, JSON.stringify(updatedFavourites)); // Also update storage here
+       } catch (error) {
+           console.error("Error saving favourites to localStorage:", error);
+       }
+      return updatedFavourites;
     });
   };
 
   const removeFavourite = (uprn: string) => {
-    setFavouritesState((prev) => prev.filter(fav => fav.uprn !== uprn));
-     // If the removed favourite was the selected address, clear selection
-    if (selectedAddress?.uprn === uprn) {
-        setSelectedAddressState(null);
-    }
-  };
+     let wasSelected = false;
+     setFavouritesState((prev) => {
+       const updatedFavourites = prev.filter(fav => fav.uprn !== uprn);
+        try {
+          localStorage.setItem(FAVOURITES_KEY, JSON.stringify(updatedFavourites)); // Update storage
+        } catch (error) {
+            console.error("Error saving favourites to localStorage:", error);
+        }
+       return updatedFavourites;
+     });
+
+     setSelectedAddressState(prevSelected => {
+        if (prevSelected?.uprn === uprn) {
+            wasSelected = true;
+            try {
+                localStorage.removeItem(SELECTED_ADDRESS_KEY); // Remove selected from storage
+            } catch (error) {
+                console.error("Error removing selected address from localStorage:", error);
+            }
+            return null; // Clear selection
+        }
+        return prevSelected;
+     });
+   };
+
 
   const setNotificationTime = (time: number) => {
      // Basic validation
      if (time >= 0 && time <= 23) {
        setNotificationTimeState(time);
+       try {
+         localStorage.setItem(NOTIFICATION_TIME_KEY, String(time)); // Update storage
+       } catch (error) {
+          console.error("Error saving notification time to localStorage:", error);
+       }
      }
    };
 
    const setNotificationsEnabled = (enabled: boolean) => {
      setNotificationsEnabledState(enabled);
+     try {
+       localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, JSON.stringify(enabled)); // Update storage
+     } catch (error) {
+        console.error("Error saving notifications enabled state to localStorage:", error);
+     }
    };
 
   return (
@@ -179,3 +231,5 @@ export function useAddress(): AddressContextType {
   }
   return context;
 }
+
+    
