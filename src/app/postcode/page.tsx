@@ -28,7 +28,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, Trash2 } from 'lucide-react'; // Added Trash2 import
 import { useToast } from '@/hooks/use-toast';
 import { Header } from '@/components/header';
 
@@ -47,10 +47,10 @@ type PostcodeFormData = z.infer<typeof postcodeSchema>;
 
 export default function PostcodePage() {
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null); // Renamed state setter
+  const [selectedAddressState, setSelectedAddressState] = useState<Address | null>(null); // Renamed state setter
   const [isLoading, setIsLoading] = useState(false);
   const [showAddressList, setShowAddressList] = useState(false);
-  const { setAddress, addFavourite, favourites, loading: addressLoading } = useAddress(); // Get favourites and loading state
+  const { setAddress, addFavourite, favourites, loading: addressLoading, selectedAddress } = useAddress(); // Get favourites, loading state, and selectedAddress
   const router = useRouter();
   const { toast } = useToast();
 
@@ -109,9 +109,9 @@ export default function PostcodePage() {
   };
 
   const handleConfirmSelection = () => {
-    if (selectedAddress) {
-      setAddress(selectedAddress);
-      addFavourite(selectedAddress); // Favourite the address automatically
+    if (selectedAddressState) {
+      setAddress(selectedAddressState);
+      addFavourite(selectedAddressState); // Favourite the address automatically
       router.push('/dashboard');
     } else {
       toast({
@@ -143,15 +143,16 @@ export default function PostcodePage() {
 
 
   return (
+    // Adjusted padding: pt-0 initially, then add padding in content area if needed
     <div className="flex flex-col items-center justify-center p-4 pt-0 h-full bg-secondary dark:bg-background">
        {/* Header removed as it's not needed on the initial postcode entry page */}
        {/* <Header showBackButton={false} /> */}
-       <div className="flex items-center mb-8 text-center">
+       <div className="flex items-center mb-8 text-center pt-12"> {/* Added top padding */}
          <Trash2 className="h-10 w-10 text-primary mr-3" />
          <h1 className="text-3xl font-bold">Put 'Em Out Dreckly</h1>
        </div>
-      {/* Removed shadow-lg */}
-      <Card className="w-full max-w-md">
+      {/* Removed shadow-lg and default shadow from card component */}
+      <Card className="w-full max-w-md shadow-none border-0 md:border md:shadow-sm">
         <CardHeader>
           <CardTitle className="text-2xl text-center">Find Your Address</CardTitle>
           <CardDescription className="text-center">
@@ -198,17 +199,20 @@ export default function PostcodePage() {
           {showAddressList && addresses.length > 0 && (
             <div className="mt-6">
               <h3 className="text-lg font-semibold mb-2">Select Your Address:</h3>
-              <ScrollArea className="h-60 w-full rounded-md border bg-background"> {/* Ensure background for scroll area */}
-                <div className="p-4 space-y-2">
+              {/* Removed border and explicit background for cleaner look */}
+              <ScrollArea className="h-60 w-full rounded-md">
+                <div className="p-1 space-y-2"> {/* Reduced padding */}
                   {addresses.map((addr) => (
                     <Button
                       key={addr.uprn}
-                      variant={selectedAddress?.uprn === addr.uprn ? 'default' : 'outline'}
-                      className={`w-full text-left justify-start h-auto py-2 whitespace-normal ${
-                        selectedAddress?.uprn === addr.uprn ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-muted/50' // Adjusted non-selected style
+                      variant={selectedAddressState?.uprn === addr.uprn ? 'default' : 'ghost'} // Use ghost for non-selected
+                      className={`w-full text-left justify-start h-auto py-2 px-3 whitespace-normal ${ // Added px-3
+                        selectedAddressState?.uprn === addr.uprn
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' // Keep selected prominent
+                          : 'hover:bg-muted/50' // Subtle hover for ghost
                       }`}
                       onClick={() => setSelectedAddressState(addr)} // Use renamed setter
-                      aria-pressed={selectedAddress?.uprn === addr.uprn}
+                      aria-pressed={selectedAddressState?.uprn === addr.uprn}
                     >
                       {addr.address}
                     </Button>
@@ -217,7 +221,7 @@ export default function PostcodePage() {
               </ScrollArea>
               <Button
                 onClick={handleConfirmSelection}
-                disabled={!selectedAddress || isLoading}
+                disabled={!selectedAddressState || isLoading}
                 className="w-full mt-4 bg-accent hover:bg-accent/90 text-accent-foreground"
               >
                 Confirm Selection
@@ -235,5 +239,3 @@ export default function PostcodePage() {
     </div>
   );
 }
-
-    
