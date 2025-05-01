@@ -39,13 +39,10 @@ const postcodeSchema = z.object({
 });
 
 type PostcodeFormData = z.infer<typeof postcodeSchema>;
-// Use Omit because the API returns addresses without postcode, we add it later.
-type FetchedAddress = Omit<Address, 'postcode'>;
-
 
 export default function PostcodePage() {
-  const [addresses, setAddresses] = useState<FetchedAddress[]>([]);
-  const [selectedFetchedAddress, setSelectedFetchedAddress] = useState<FetchedAddress | null>(null);
+  const [addresses, setAddresses] = useState<Address[]>([]); // Store full Address object including postcode
+  const [selectedAddressInternal, setSelectedAddressInternal] = useState<Address | null>(null); // Renamed state variable
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false); // For confirm button loading
   const [showAddressList, setShowAddressList] = useState(false);
@@ -61,21 +58,28 @@ export default function PostcodePage() {
     },
   });
 
-   // --- Removed the useEffect causing immediate redirects ---
    // Initial routing is handled by SplashScreen.
    // If the user navigates here after the app has loaded,
    // we assume it's intentional (e.g., from settings).
 
   const onSubmit: SubmitHandler<PostcodeFormData> = async (data) => {
     const searchPostcode = data.postcode;
-    setLastSearchedPostcode(searchPostcode);
+    setLastSearchedPostcode(searchPostcode); // Store the postcode used for the search
     setIsLoading(true);
     setShowAddressList(false);
-    setSelectedFetchedAddress(null);
+    setSelectedAddressInternal(null);
     setAddresses([]);
 
     try {
-      const fetchedAddresses = await getAddressesByPostcode(searchPostcode);
+      // Fetch addresses - API returns { address: string, uprn: string }[]
+      const fetchedAddressesRaw = await getAddressesByPostcode(searchPostcode);
+
+      // Add the searched postcode back to each address object
+      const fetchedAddresses = fetchedAddressesRaw.map(addr => ({
+          ...addr,
+          postcode: searchPostcode // Add the postcode here
+      }));
+
 
       if (fetchedAddresses.length > 0) {
         setAddresses(fetchedAddresses);
@@ -105,13 +109,10 @@ export default function PostcodePage() {
 
   const handleConfirmSelection = () => {
      setIsSubmitting(true); // Indicate loading on confirm button
-     if (selectedFetchedAddress && lastSearchedPostcode) {
-        const fullAddress: Address = {
-            ...selectedFetchedAddress,
-            postcode: lastSearchedPostcode,
-        };
-        setAddress(fullAddress);
-        addFavourite(fullAddress);
+     if (selectedAddressInternal) { // Use the renamed state variable
+        // The selectedAddressInternal already includes the postcode from the mapping above
+        setAddress(selectedAddressInternal);
+        addFavourite(selectedAddressInternal);
         // Delay slightly to show loading feedback
         setTimeout(() => {
             router.push('/dashboard');
@@ -126,6 +127,50 @@ export default function PostcodePage() {
       });
     }
   };
+
+    // Helper function for Title Case (copied from settings)
+    const titleCase = (str: string): string => {
+        if (!str) return '';
+        // Handle potential all-caps input from API by converting to lower first
+        return str.toLowerCase()
+          .split(/[\s,]+/) // Split by space or comma
+          .map(word => {
+            if (word.length > 0) {
+              // Capitalize first letter
+              return word.charAt(0).toUpperCase() + word.slice(1);
+            }
+            return '';
+          })
+          .join(' '); // Rejoin with spaces
+      };
+
+   // Function to format address display based on the required format
+   const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
+     if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
+     if (!postcode) return titleCase(fullAddressString); // Fallback if postcode is missing
+
+     // 1. Remove Postcode (assuming UK format, potentially with or without space)
+     const postcodeRegex = new RegExp(`\\s*${postcode.replace(/\s/g, '\\s?')}\\s*,?`, 'i');
+     let addressPart = fullAddressString.replace(postcodeRegex, '');
+
+     // 2. Remove common county names (add more if needed)
+     const counties = ['Cornwall', 'Devon']; // Example list
+     counties.forEach(county => {
+        // Match whole word, case-insensitive, followed by optional comma and space
+       const countyRegex = new RegExp(`\\b${county}\\b\\s*,?`, 'gi');
+       addressPart = addressPart.replace(countyRegex, '');
+     });
+
+     // 3. Remove trailing commas and whitespace
+     addressPart = addressPart.replace(/,\s*$/, '').trim();
+
+     // 4. Remove UPRN if present (assuming it's numeric and at the end)
+     addressPart = addressPart.replace(/,\s*\d{10,12}$/, '').trim(); // Regex for comma + space + 10-12 digits at the end
+
+     // 5. Apply Title Case
+     return titleCase(addressPart);
+   };
+
 
 
   return (
@@ -218,7 +263,7 @@ export default function PostcodePage() {
                 size="icon"
                 onClick={() => {
                     setShowAddressList(false); // Go back to postcode input
-                    setSelectedFetchedAddress(null); // Clear selection when going back
+                    setSelectedAddressInternal(null); // Clear selection when going back
                     // form.reset({ postcode: lastSearchedPostcode }); // Optionally reset form with last postcode
                 }}
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground"
@@ -235,16 +280,16 @@ export default function PostcodePage() {
                 <button
                   key={addr.uprn}
                   className={`w-full text-left py-3 px-1 flex items-center gap-3 border-b last:border-b-0 ${
-                    selectedFetchedAddress?.uprn === addr.uprn ? 'font-semibold text-primary' : 'text-foreground hover:bg-muted/50'
+                    selectedAddressInternal?.uprn === addr.uprn ? 'font-semibold text-primary' : 'text-foreground hover:bg-muted/50'
                   }`}
-                  onClick={() => setSelectedFetchedAddress(addr)}
-                  aria-pressed={selectedFetchedAddress?.uprn === addr.uprn}
+                  onClick={() => setSelectedAddressInternal(addr)} // Use renamed state setter
+                  aria-pressed={selectedAddressInternal?.uprn === addr.uprn}
                 >
                    {/* Icon changes color based on selection */}
-                  <MapPin className={`h-5 w-5 shrink-0 ${selectedFetchedAddress?.uprn === addr.uprn ? 'text-primary' : 'text-muted-foreground'}`} />
-                  <span className="flex-grow">{addr.address}</span>
+                  <MapPin className={`h-5 w-5 shrink-0 ${selectedAddressInternal?.uprn === addr.uprn ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className="flex-grow">{formatDisplayAddress(addr.address, addr.postcode)}</span> {/* Use new formatter */}
                    {/* "Selected" text aligned right */}
-                  {selectedFetchedAddress?.uprn === addr.uprn && (
+                  {selectedAddressInternal?.uprn === addr.uprn && (
                     <span className="text-primary text-sm ml-auto mr-1 flex items-center gap-1">
                       <Check className="h-4 w-4" /> Selected
                     </span>
@@ -257,7 +302,7 @@ export default function PostcodePage() {
           <div className="mt-auto mb-4"> {/* Button at the bottom */}
              <Button
                onClick={handleConfirmSelection}
-               disabled={!selectedFetchedAddress || isSubmitting}
+               disabled={!selectedAddressInternal || isSubmitting} // Use renamed state variable
                className="w-full h-12 text-lg font-semibold rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
              >
                {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirm Selection'}

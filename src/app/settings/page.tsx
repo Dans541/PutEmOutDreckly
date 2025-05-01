@@ -72,15 +72,31 @@ export default function SettingsPage() {
      return `${outward} ${inward}`;
    };
 
-    // Function to format address display based on backend API logic.
-    // The API already provides the desired string in the 'address' field.
-    // We just need to apply Title Case here.
-    const formatDisplayAddress = (fullAddressString: string | undefined): string => {
-        if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
+    // Function to format address display based on the required format: "Flat number, House Name, Road Name"
+    const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
+      if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
+      if (!postcode) return titleCase(fullAddressString); // Fallback if postcode is missing
 
-        // The backend API response (`address` field) contains the pre-formatted string.
-        // Simply apply Title Case to it.
-        return titleCase(fullAddressString);
+      // 1. Remove Postcode (assuming UK format, potentially with or without space)
+      const postcodeRegex = new RegExp(`\\s*${postcode.replace(/\s/g, '\\s?')}\\s*,?`, 'i');
+      let addressPart = fullAddressString.replace(postcodeRegex, '');
+
+      // 2. Remove common county names (add more if needed)
+      const counties = ['Cornwall', 'Devon']; // Example list
+      counties.forEach(county => {
+         // Match whole word, case-insensitive, followed by optional comma and space
+        const countyRegex = new RegExp(`\\b${county}\\b\\s*,?`, 'gi');
+        addressPart = addressPart.replace(countyRegex, '');
+      });
+
+      // 3. Remove trailing commas and whitespace
+      addressPart = addressPart.replace(/,\s*$/, '').trim();
+
+      // 4. Remove UPRN if present (assuming it's numeric and at the end)
+      addressPart = addressPart.replace(/,\s*\d{10,12}$/, '').trim(); // Regex for comma + space + 10-12 digits at the end
+
+      // 5. Apply Title Case
+      return titleCase(addressPart);
     };
 
 
@@ -157,12 +173,12 @@ export default function SettingsPage() {
                        <button
                          className="flex-grow flex items-center gap-3 text-left group"
                          onClick={() => handleSelectFavourite(fav)}
-                         aria-label={`Select address: ${formatDisplayAddress(fav.address)}. ${selectedAddress?.uprn === fav.uprn ? 'Currently selected.' : ''}`}
+                         aria-label={`Select address: ${formatDisplayAddress(fav.address, fav.postcode)}. ${selectedAddress?.uprn === fav.uprn ? 'Currently selected.' : ''}`}
                        >
                           <MapPin className={`h-5 w-5 shrink-0 ${selectedAddress?.uprn === fav.uprn ? 'text-primary' : 'text-muted-foreground'}`} />
                           <div className="flex-grow min-w-0"> {/* Added min-w-0 for proper truncation */}
                            <span className={`block text-sm truncate ${selectedAddress?.uprn === fav.uprn ? 'font-semibold text-primary' : 'text-foreground'}`}>
-                              {formatDisplayAddress(fav.address)} {/* Use simplified formatted address */}
+                              {formatDisplayAddress(fav.address, fav.postcode)} {/* Use updated formatter */}
                            </span>
                            <span className="block text-xs text-muted-foreground">{formatPostcode(fav.postcode)}</span> {/* Use formatted postcode */}
                          </div>
@@ -176,7 +192,7 @@ export default function SettingsPage() {
                         size="icon"
                         className="text-muted-foreground hover:text-destructive h-8 w-8 shrink-0"
                         onClick={(e) => { e.stopPropagation(); handleDeleteFavourite(fav.uprn); }}
-                        aria-label={`Remove ${formatDisplayAddress(fav.address)} from favourites`}
+                        aria-label={`Remove ${formatDisplayAddress(fav.address, fav.postcode)} from favourites`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -247,7 +263,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-
-    
-    
