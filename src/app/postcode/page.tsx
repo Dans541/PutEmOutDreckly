@@ -21,7 +21,7 @@ import {
   FormMessage, // Removed FormLabel
 } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, MapPin, Check } from 'lucide-react'; // Removed unused Trash2
+import { Loader2, Search, MapPin, Check, Trash2 } from 'lucide-react'; // Added Trash2 from previous request
 import { useToast } from '@/hooks/use-toast';
 import { PostcodeIllustration } from '@/components/postcode-illustration'; // Import the illustration
 
@@ -40,25 +40,23 @@ const postcodeSchema = z.object({
 
 type PostcodeFormData = z.infer<typeof postcodeSchema>;
 
-// Helper function for Title Case, preserving commas and handling mixed case input
+// Helper function for Title Case, preserving commas and handling all caps
 const titleCase = (str: string): string => {
     if (!str) return '';
-    // Convert the whole string to lower case first to handle potential all-caps parts
-    const lowerCaseStr = str.toLowerCase();
-    // Split by comma, title case each part, join with ", "
-    return lowerCaseStr
-      .split(',')
-      .map(part =>
-        part
-          .trim()
-          .split(' ')
-          .map(word => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
-          .join(' ')
-      )
-      .filter(part => part.length > 0) // Remove empty parts resulting from trailing commas etc.
-      .join(', '); // Join parts with ", "
+    // Split by comma, trim whitespace, title case each part, then join back with ", "
+    return str
+        .split(',')
+        .map(part =>
+            part
+                .trim()
+                .toLowerCase() // Convert to lower case first to handle ALL CAPS input
+                .split(' ')
+                .map(word => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
+                .join(' ')
+        )
+        .filter(part => part.length > 0) // Remove empty parts resulting from multiple commas etc.
+        .join(', ');
 };
-
 
 // Function to format address display based on the required format
 // Example Target: Flat 1, Lower Budock Mill, Hill Head, Penryn
@@ -67,37 +65,32 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
 
     let addressPart = fullAddressString;
 
-    // 1. Remove Postcode (if provided and found) - more robust regex
+    // 1. Remove Postcode (if provided and found at the end)
     if (postcode) {
-        // Regex to match postcode potentially with space, optionally preceded by a comma and whitespace, at the end of the string
-        const postcodeRegex = new RegExp(`(?:,\\s*)?${postcode.replace(/\s/g, '\\s?')}\\s*$`, 'i');
-        addressPart = addressPart.replace(postcodeRegex, '').trim();
-        // Remove trailing comma if postcode removal left one
-        addressPart = addressPart.replace(/,\s*$/, '').trim();
+        // Regex to match postcode potentially with space, followed by optional comma and whitespace AT THE END of the string
+        const postcodeRegexEnd = new RegExp(`\\s*,?\\s*${postcode.replace(/\s/g, '\\s?')}\\s*$`, 'i');
+        addressPart = addressPart.replace(postcodeRegexEnd, '');
     }
 
-    // 2. Remove common county names (case-insensitive, whole word, preceded by optional comma and space, usually at the end)
-    const counties = ['Cornwall', 'Devon']; // Add more if needed
-    counties.forEach(county => {
-        // Match the county, optionally preceded by a comma and whitespace, at the very end of the string
-        const countyRegex = new RegExp(`(?:,\\s*)?\\b${county}\\b\\s*$`, 'gi');
-        addressPart = addressPart.replace(countyRegex, '').trim();
-        // Remove trailing comma if county removal left one
-        addressPart = addressPart.replace(/,\s*$/, '').trim();
-    });
+     // 2. Remove common county names (case-insensitive, whole word, at the end)
+     const counties = ['Cornwall', 'Devon']; // Add more if needed
+     counties.forEach(county => {
+       // Match optional comma, whitespace, county name, optional comma, whitespace AT THE END
+       const countyRegex = new RegExp(`(?:,\\s*)?\\b${county}\\b(?:,\\s*)?$`, 'gi');
+       addressPart = addressPart.replace(countyRegex, '');
+     });
 
 
     // 3. Remove UPRN if present (assuming it's numeric and at the end, potentially after a comma)
-    // This might be redundant if the API doesn't include it, but safe to keep
-    addressPart = addressPart.replace(/(?:,\s*)?\d{10,12}\s*$/, '').trim();
-    // Remove trailing comma if UPRN removal left one
+    // Match optional comma, whitespace, 10-12 digits AT THE END
+    addressPart = addressPart.replace(/(?:,\s*)?\d{10,12}$/, '').trim();
+
+    // 4. Remove any remaining trailing commas and whitespace
     addressPart = addressPart.replace(/,\s*$/, '').trim();
 
-
-    // 4. Apply Title Case using the refined helper
+    // 5. Apply Title Case (handles all caps and joins with ", ")
     return titleCase(addressPart);
 };
-
 
 export default function PostcodePage() {
   const [addresses, setAddresses] = useState<Address[]>([]); // Store full Address object including postcode
@@ -119,7 +112,7 @@ export default function PostcodePage() {
 
    // Initial routing is handled by SplashScreen.
    // If the user navigates here after the app has loaded,
-   // we assume it's intentional (e.g., from settings).
+   // we assume it's intentional (e.g., from settings or add new).
 
   const onSubmit: SubmitHandler<PostcodeFormData> = async (data) => {
     const searchPostcode = data.postcode;
@@ -330,3 +323,59 @@ export default function PostcodePage() {
   );
 }
 
+// --- Test Function ---
+export async function testAddressFormatting() {
+    const testPostcode = 'TR10 8JT';
+    console.log(`--- TESTING ADDRESS FORMATTING for ${testPostcode} ---`);
+    try {
+        const addressesRaw = await getAddressesByPostcode(testPostcode);
+        const addressesWithPostcode = addressesRaw.map(addr => ({ ...addr, postcode: testPostcode }));
+
+        console.log("\nRaw Addresses Received:");
+        addressesRaw.forEach(addr => console.log(`  UPRN: ${addr.uprn}, Raw Address: ${addr.address}`));
+
+        console.log("\nFormatted Addresses:");
+        addressesWithPostcode.forEach(addr => {
+            const formatted = formatDisplayAddress(addr.address, addr.postcode);
+            console.log(`  UPRN: ${addr.uprn}, Formatted: ${formatted}`);
+        });
+
+        // Example specific checks:
+        const flat1 = addressesWithPostcode.find(a => a.uprn === '100040012454'); // UPRN for Flat 1
+        if (flat1) {
+            const formattedFlat1 = formatDisplayAddress(flat1.address, flat1.postcode);
+            console.log(`\nSpecific Check (Flat 1): Expected starts with "Flat 1, Lower Budock Mill..." -> Actual: "${formattedFlat1}"`);
+            if (!formattedFlat1.startsWith("Flat 1, Lower Budock Mill")) {
+                 console.error("   -> FORMATTING FAILED for Flat 1");
+            } else {
+                 console.log("   -> Formatting OK for Flat 1");
+            }
+        } else {
+            console.log("\nSpecific Check (Flat 1): UPRN 100040012454 not found in results.");
+        }
+
+        const hillHead = addressesWithPostcode.find(a => a.uprn === '100040012457'); // UPRN for Hill Head
+         if (hillHead) {
+             const formattedHillHead = formatDisplayAddress(hillHead.address, hillHead.postcode);
+             console.log(`\nSpecific Check (Hill Head): Expected starts with "Hill Head, Lower Budock..." -> Actual: "${formattedHillHead}"`);
+             if (!formattedHillHead.startsWith("Hill Head, Lower Budock")) {
+                  console.error("   -> FORMATTING FAILED for Hill Head");
+             } else {
+                  console.log("   -> Formatting OK for Hill Head");
+             }
+         } else {
+             console.log("\nSpecific Check (Hill Head): UPRN 100040012457 not found in results.");
+         }
+
+
+    } catch (error) {
+        console.error("Error during address formatting test:", error);
+    }
+    console.log(`--- END TESTING ADDRESS FORMATTING ---`);
+}
+
+// --- You can call this test function from a suitable place, e.g., temporarily in useEffect or a button click ---
+// useEffect(() => {
+//     testAddressFormatting();
+// }, []);
+// -------------------------------------------------------------------------------------------------------------
