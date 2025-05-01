@@ -5,23 +5,22 @@
 
 import { getAddressesByPostcode, type Address } from '@/services/cornwall-council-api';
 
-// Helper function for Title Case, preserving commas and handling all caps (Copied from postcode/page.tsx)
+// Helper function for Title Case, splitting by space (Copied from postcode/page.tsx)
 const titleCase = (str: string): string => {
     if (!str) return '';
-    // Split by comma, trim whitespace, title case each part, then join back with ", "
-    return str
-        .split(',')
-        .map(part =>
-            part
-                .trim()
-                .toLowerCase() // Convert to lower case first to handle ALL CAPS input
-                .split(' ')
-                .map(word => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
-                .join(' ')
-        )
-        .filter(part => part.length > 0) // Remove empty parts resulting from multiple commas etc.
-        .join(', ');
+    // Convert to lower case first to handle ALL CAPS input
+    // Split by space, title case each word, rejoin with space
+    return str.toLowerCase().split(' ').map(word => {
+        if (word.length === 0) return '';
+        // Handle cases like "(part Of)" -> "(Part Of)"
+        if (word.startsWith('(') && word.endsWith(')')) {
+            const inner = word.slice(1, -1);
+            return `(${titleCase(inner)})`; // Recursively title case inner part
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(' ');
 };
+
 
 // Function to format address display (Copied from postcode/page.tsx)
 // Example Target: Flat 1, Lower Budock Mill, Hill Head, Penryn
@@ -30,31 +29,31 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
 
     let addressPart = fullAddressString;
 
-    // 1. Remove Postcode (if provided and found at the end)
+    // 1. Remove Postcode (if provided and found at the end) - More robust regex
     if (postcode) {
-        // Regex to match postcode potentially with space, followed by optional comma and whitespace AT THE END of the string
-        const postcodeRegexEnd = new RegExp(`\\s*,?\\s*${postcode.replace(/\s/g, '\\s?')}\\s*$`, 'i');
-        addressPart = addressPart.replace(postcodeRegexEnd, '');
+        // Match optional comma, optional space, postcode (with optional internal space), optional space, $END
+        const postcodeRegexEnd = new RegExp(`\\s*,?\\s*${postcode.slice(0, -3)}\\s?${postcode.slice(-3)}\\s*$`, 'i');
+        addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
     }
 
-     // 2. Remove common county names (case-insensitive, whole word, at the end)
+     // 2. Remove common county names (case-insensitive, whole word, preceded by comma and space, at the end)
      const counties = ['Cornwall', 'Devon']; // Add more if needed
      counties.forEach(county => {
-       // Match optional comma, whitespace, county name, optional comma, whitespace AT THE END
-       const countyRegex = new RegExp(`(?:,\\s*)?\\b${county}\\b(?:,\\s*)?$`, 'gi');
-       addressPart = addressPart.replace(countyRegex, '');
+       // Match specifically ", county" or ", COUNTY" at the end
+       const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'gi');
+       addressPart = addressPart.replace(countyRegex, '').trim();
      });
 
 
-    // 3. Remove UPRN if present (assuming it's numeric and at the end, potentially after a comma)
-    // Match optional comma, whitespace, 10-12 digits AT THE END
-    addressPart = addressPart.replace(/(?:,\s*)?\d{10,12}$/, '').trim();
+    // 3. Remove UPRN if present (assuming it's numeric, 10-12 digits, preceded by comma and space, at the end)
+    addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim();
 
     // 4. Remove any remaining trailing commas and whitespace
     addressPart = addressPart.replace(/,\s*$/, '').trim();
 
-    // 5. Apply Title Case (handles all caps and joins with ", ")
-    return titleCase(addressPart);
+    // 5. Apply Title Case (using the space-based title case function)
+    // Then, ensure commas are followed by a space for consistent formatting.
+    return titleCase(addressPart).replace(/,(?=\S)/g, ', '); // Add space after comma if missing
 };
 
 
@@ -81,11 +80,10 @@ export async function runAddressFormattingTest(postcode: string) {
              }
              const countiesLower = ['cornwall', 'devon']; // Add more if needed
              countiesLower.forEach(county => {
-                 // More robust check: Ensure county isn't part of a legitimate address segment (e.g., Cornwall Road)
-                 // This checks for ", county" pattern, which is more likely to be the unwanted part
+                 // Checks for ", county" pattern, which is more likely to be the unwanted part
                  if (formatted.toLowerCase().includes(`, ${county}`)) {
                      console.error(`   [FAIL] UPRN ${addr.uprn}: Formatted address might still contain county "${county}": "${formatted}"`);
-                     // Temporarily disabling failure for this to avoid false positives on street names like "Cornwall Road"
+                     // Disable failure for now to avoid false positives on street names like "Cornwall Road"
                      // success = false;
                  }
              });
@@ -94,12 +92,28 @@ export async function runAddressFormattingTest(postcode: string) {
                  console.error(`   [FAIL] UPRN ${addr.uprn}: Formatted address ends with a comma: "${formatted}"`);
                  success = false;
              }
+              // Check for double commas
+             if (formatted.includes(',,')) {
+                  console.error(`   [FAIL] UPRN ${addr.uprn}: Formatted address contains double commas: "${formatted}"`);
+                  success = false;
+             }
+             // Check for space before comma
+              if (formatted.match(/\s,/)) {
+                  console.error(`   [FAIL] UPRN ${addr.uprn}: Formatted address contains space before comma: "${formatted}"`);
+                  success = false;
+             }
+              // Check for missing space after comma
+             if (formatted.match(/,[^\s]/) && !formatted.match(/,\d/)) { // Allow comma directly followed by number (e.g. Flat 1,2 Smith Street - although unlikely)
+                  console.error(`   [FAIL] UPRN ${addr.uprn}: Formatted address might be missing space after comma: "${formatted}"`);
+                  success = false;
+             }
         });
 
         // --- Specific checks based on TR10 8JT example ---
         if (postcode.toUpperCase().replace(' ', '') === 'TR108JT') {
             console.log("\n--- Specific Checks for TR10 8JT ---");
             const flat1 = addressesWithPostcode.find(a => a.uprn === '100040012454'); // Flat 1
+            // Expected output after correct TitleCase and comma spacing
             const expectedFlat1 = "Flat 1, Lower Budock Mill, Hill Head, Penryn";
             if (flat1) {
                 const formattedFlat1 = formatDisplayAddress(flat1.address, flat1.postcode);
@@ -117,7 +131,7 @@ export async function runAddressFormattingTest(postcode: string) {
             }
 
             const hillHead = addressesWithPostcode.find(a => a.uprn === '100040012457'); // Hill Head
-             // Updated expected based on titleCase behaviour: It joins parts with ", "
+             // Updated expected based on TitleCase and comma spacing
             const expectedHillHead = "Hill Head, Lower Budock, Penryn";
              if (hillHead) {
                  const formattedHillHead = formatDisplayAddress(hillHead.address, hillHead.postcode);
@@ -133,6 +147,23 @@ export async function runAddressFormattingTest(postcode: string) {
              } else {
                  console.warn("  Specific Check (Hill Head): UPRN 100040012457 not found.");
              }
+
+              const flat3 = addressesWithPostcode.find(a => a.uprn === '100041078821'); // Flat 3
+             const expectedFlat3 = "Flat 3, The Old Blacksmiths Shop, 3 Hill Head, Penryn";
+              if (flat3) {
+                  const formattedFlat3 = formatDisplayAddress(flat3.address, flat3.postcode);
+                  console.log(`  Check (Flat 3):`);
+                  console.log(`    Expected: "${expectedFlat3}"`);
+                  console.log(`    Actual:   "${formattedFlat3}"`);
+                  if (formattedFlat3 !== expectedFlat3) {
+                       console.error("    [FAIL] Specific check for Flat 3 failed.");
+                       success = false;
+                  } else {
+                       console.log("    [PASS] Specific check for Flat 3 passed.");
+                  }
+              } else {
+                  console.warn("  Specific Check (Flat 3): UPRN 100041078821 not found.");
+              }
         }
 
     } catch (error) {
@@ -146,5 +177,5 @@ export async function runAddressFormattingTest(postcode: string) {
 }
 
 // Example of how to run the test (e.g., from a script or dev environment)
-runAddressFormattingTest('TR10 8JT');
+// runAddressFormattingTest('TR10 8JT');
 // runAddressFormattingTest('TR11 2NG'); // Test another postcode
