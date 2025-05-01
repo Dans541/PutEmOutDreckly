@@ -73,48 +73,83 @@ export default function SettingsPage() {
    };
 
     // Function to format address display: "Flat/Number, Building Name, Road Name"
-    // e.g., "Flat 1, Lower Budock Mill, Hill Head" or "21 Meadowbank Road"
+    // e.g., "Flat 1, Lower Budock Mill, Hill Head"
     const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
-      if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
-      if (!postcode || typeof postcode !== 'string') return titleCase(fullAddressString); // Fallback if postcode missing
+        if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
+        if (!postcode || typeof postcode !== 'string') return titleCase(fullAddressString); // Fallback
 
-      // 1. Define patterns/words to remove (case-insensitive)
-      const postcodeRegex = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i;
-      // Add common towns/areas to help remove them - this list might need expanding
-      const knownTownsOrAreas = ['penryn', 'falmouth', 'truro', 'camborne', 'redruth', 'penzance', 'st austell', 'bodmin', 'newquay', 'helston', 'st ives', 'saltash', 'liskeard', 'launceston', 'hayle', 'torpoint', 'wadebridge', 'st just', 'bude', 'callington', 'padstow', 'fowey', 'lostwithiel', 'perranporth', 'mousehole', 'polzeath'];
-      const wordsToRemove = ['cornwall', ...knownTownsOrAreas];
-      const normalizedPostcode = postcode.toUpperCase().replace(/\s/g, ''); // For matching
+        // Normalize strings for comparison
+        let address = fullAddressString;
+        const lowerAddress = address.toLowerCase();
+        const lowerPostcodeWithSpace = formatPostcode(postcode).toLowerCase();
+        const lowerPostcodeWithoutSpace = postcode.toLowerCase().replace(/\s/g, '');
 
-      // 2. Split the address string by spaces AND commas, trimming parts
-      const parts = fullAddressString.split(/[\s,]+/).map(part => part.trim()).filter(part => part);
+        // 1. Define terms to remove from the end (order matters)
+        const termsToRemove = [
+            `, ${lowerPostcodeWithSpace}`, lowerPostcodeWithSpace, // With comma first
+            `, ${lowerPostcodeWithoutSpace}`, lowerPostcodeWithoutSpace,
+            ', cornwall', ' cornwall',
+            // Add common Cornwall towns/areas (lowercase) - add more as needed
+            ', penryn', ' penryn',
+            ', falmouth', ' falmouth',
+            ', truro', ' truro',
+            ', camborne', ' camborne',
+            ', redruth', ' redruth',
+            ', penzance', ' penzance',
+            ', st austell', ' st austell',
+            ', bodmin', ' bodmin',
+            ', newquay', ' newquay',
+            ', helston', ' helston',
+            ', st ives', ' st ives',
+            ', saltash', ' saltash',
+            ', liskeard', ' liskeard',
+            ', launceston', ' launceston',
+            ', hayle', ' hayle',
+            ', torpoint', ' torpoint',
+            ', wadebridge', ' wadebridge',
+            ', st just', ' st just',
+            ', bude', ' bude',
+            ', callington', ' callington',
+            ', padstow', ' padstow',
+            ', fowey', ' fowey',
+            ', lostwithiel', ' lostwithiel',
+            ', perranporth', ' perranporth',
+            ', mousehole', ' mousehole',
+            ', polzeath', ' polzeath',
+        ];
 
-      // 3. Filter out unwanted parts
-      const relevantParts = parts.filter(part => {
-          const lowerPart = part.toLowerCase();
-          // Remove postcode (allow with or without space)
-          if (postcodeRegex.test(part)) return false;
-          // Remove normalized postcode if it got split differently
-          if (part.toUpperCase().replace(/\s/g, '') === normalizedPostcode) return false;
-          // Remove known words like 'Cornwall' and common towns/areas
-          if (wordsToRemove.includes(lowerPart)) return false;
-          // Remove potential trailing UPRN (though it should be separate)
-          if (/^\d{10,}$/.test(part)) return false; // Basic check for long numbers
-          return true;
-      });
+        // Remove UPRN if it's appended (basic check for long number at the end)
+        address = address.replace(/,\s*\d{10,}$/, '').trim();
+        address = address.replace(/\s+\d{10,}$/, '').trim();
 
-      // 4. Join the remaining parts and apply Title Case
-      let formattedAddress = titleCase(relevantParts.join(' '));
 
-      // 5. If the result is empty, fallback to the original string (title-cased, first part)
-      if (!formattedAddress) {
-          formattedAddress = titleCase(fullAddressString.split(',')[0] || fullAddressString); // Fallback
-      }
+        // 2. Iteratively remove terms from the end of the lowercased string
+        let cleanedLowerAddress = lowerAddress;
+        termsToRemove.forEach(term => {
+            if (cleanedLowerAddress.endsWith(term)) {
+                cleanedLowerAddress = cleanedLowerAddress.substring(0, cleanedLowerAddress.length - term.length).trim();
+            }
+        });
 
-      // 6. Specific formatting for "Flat X, ..."
-      // Ensure comma after flat number if followed by a letter (start of name/road)
-      formattedAddress = formattedAddress.replace(/^(Flat \d+) ([A-Za-z])/i, '$1, $2');
+        // 3. Get the corresponding part from the original cased string
+        let finalAddress = address.substring(0, cleanedLowerAddress.length).trim();
+        finalAddress = finalAddress.replace(/,$/, '').trim(); // Remove trailing comma if any
 
-      return formattedAddress;
+        // 4. Apply Title Case
+        finalAddress = titleCase(finalAddress);
+
+        // 5. Add comma after "Flat X" or "Number X" if needed
+        // Looks for "Flat" or "Number" followed by digits, then a space, then a capital letter (start of next part)
+        finalAddress = finalAddress.replace(/^(Flat \d+|[A-Z]?\d+[A-Z]?)\s([A-Z])/i, '$1, $2');
+        // Add comma after a house name ending in a letter if followed by a number (start of street num) - less common?
+        // finalAddress = finalAddress.replace(/([a-zA-Z])\s(\d+[A-Z]?\s[A-Z])/i, '$1, $2');
+
+        // If cleaning resulted in empty string, fallback to first part of original
+        if (!finalAddress) {
+          return titleCase(fullAddressString.split(',')[0] || fullAddressString);
+        }
+
+        return finalAddress;
     };
 
 
@@ -283,4 +318,5 @@ export default function SettingsPage() {
 }
 
 
+    
     
