@@ -31,7 +31,7 @@ const titleCase = (str: string): string => {
 };
 
 // Function to format address display based on the required format
-// Updated with user-provided code
+// Updated with user-provided code (2024-07-26)
 const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
     if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
 
@@ -39,7 +39,10 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
 
     // 1. Remove Postcode (if provided and found at the end)
     if (postcode) {
-        const postcodeRegexEnd = new RegExp(`\\s*,?\\s*${postcode.slice(0, -3)}\\s?${postcode.slice(-3)}\\s*$`, 'i');
+        // Make regex more robust for postcodes like 'TR108JT' or 'TR10 8JT'
+        const pcOut = postcode.slice(0, -3);
+        const pcIn = postcode.slice(-3);
+        const postcodeRegexEnd = new RegExp(`\\s*,?\\s*${pcOut}\\s?${pcIn}\\s*$`, 'i');
         addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
     }
 
@@ -51,21 +54,25 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
     });
 
     // 3. Remove UPRN if present (assuming it's numeric, 10-12 digits, preceded by comma and space, at the end)
+    // The API response should already not have UPRN in the 'address' string itself, but this is a safeguard.
     addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim();
 
     // 4. Remove any remaining trailing commas and whitespace
     addressPart = addressPart.replace(/,\s*$/, '').trim();
 
-    // 5. Split into parts, trim each, remove blanks and deduplicate
-    let parts = addressPart.split(',').map(p => p.trim()).filter(Boolean);
+    // 5. Split into parts by comma, trim each part, and filter out empty parts.
+    let parts = addressPart.split(',')
+        .map(p => p.trim()) // Trim whitespace from each part
+        .filter(Boolean); // Remove empty strings
 
-    // 6. Optionally, limit to the first 4-5 parts (to avoid very long addresses)
+    // 6. Limit to the first N relevant parts if needed (e.g., to avoid excessively long strings)
+    // Let's keep it reasonably long for now, e.g., 5 parts max. Adjust if needed.
     // parts = parts.slice(0, 5);
 
     // 7. Apply Title Case to each part
     parts = parts.map(titleCase);
 
-    // 8. Rejoin with ', '
+    // 8. Rejoin the parts with a comma and a space.
     return parts.join(', ');
 };
 
