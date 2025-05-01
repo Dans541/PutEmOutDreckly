@@ -21,7 +21,7 @@ import {
   FormMessage, // Removed FormLabel
 } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, MapPin, Check, Trash2 } from 'lucide-react'; // Added Trash2
+import { Loader2, Search, MapPin, Check } from 'lucide-react'; // Removed unused Trash2
 import { useToast } from '@/hooks/use-toast';
 import { PostcodeIllustration } from '@/components/postcode-illustration'; // Import the illustration
 
@@ -39,6 +39,65 @@ const postcodeSchema = z.object({
 });
 
 type PostcodeFormData = z.infer<typeof postcodeSchema>;
+
+// Helper function for Title Case, preserving commas and handling mixed case input
+const titleCase = (str: string): string => {
+    if (!str) return '';
+    // Convert the whole string to lower case first to handle potential all-caps parts
+    const lowerCaseStr = str.toLowerCase();
+    // Split by comma, title case each part, join with ", "
+    return lowerCaseStr
+      .split(',')
+      .map(part =>
+        part
+          .trim()
+          .split(' ')
+          .map(word => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
+          .join(' ')
+      )
+      .filter(part => part.length > 0) // Remove empty parts resulting from trailing commas etc.
+      .join(', '); // Join parts with ", "
+};
+
+
+// Function to format address display based on the required format
+// Example Target: Flat 1, Lower Budock Mill, Hill Head, Penryn
+const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
+    if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
+
+    let addressPart = fullAddressString;
+
+    // 1. Remove Postcode (if provided and found) - more robust regex
+    if (postcode) {
+        // Regex to match postcode potentially with space, optionally preceded by a comma and whitespace, at the end of the string
+        const postcodeRegex = new RegExp(`(?:,\\s*)?${postcode.replace(/\s/g, '\\s?')}\\s*$`, 'i');
+        addressPart = addressPart.replace(postcodeRegex, '').trim();
+        // Remove trailing comma if postcode removal left one
+        addressPart = addressPart.replace(/,\s*$/, '').trim();
+    }
+
+    // 2. Remove common county names (case-insensitive, whole word, preceded by optional comma and space, usually at the end)
+    const counties = ['Cornwall', 'Devon']; // Add more if needed
+    counties.forEach(county => {
+        // Match the county, optionally preceded by a comma and whitespace, at the very end of the string
+        const countyRegex = new RegExp(`(?:,\\s*)?\\b${county}\\b\\s*$`, 'gi');
+        addressPart = addressPart.replace(countyRegex, '').trim();
+        // Remove trailing comma if county removal left one
+        addressPart = addressPart.replace(/,\s*$/, '').trim();
+    });
+
+
+    // 3. Remove UPRN if present (assuming it's numeric and at the end, potentially after a comma)
+    // This might be redundant if the API doesn't include it, but safe to keep
+    addressPart = addressPart.replace(/(?:,\s*)?\d{10,12}\s*$/, '').trim();
+    // Remove trailing comma if UPRN removal left one
+    addressPart = addressPart.replace(/,\s*$/, '').trim();
+
+
+    // 4. Apply Title Case using the refined helper
+    return titleCase(addressPart);
+};
+
 
 export default function PostcodePage() {
   const [addresses, setAddresses] = useState<Address[]>([]); // Store full Address object including postcode
@@ -127,56 +186,6 @@ export default function PostcodePage() {
       });
     }
   };
-
-    // Helper function for Title Case, preserving commas
-    const titleCase = (str: string): string => {
-      if (!str) return '';
-      // Split by comma, title case each part, then join back with ", "
-      return str
-        .split(',')
-        .map(part =>
-          part
-            .trim()
-            .toLowerCase()
-            .split(' ')
-            .map(word => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
-            .join(' ')
-        )
-        .filter(part => part.length > 0) // Remove empty parts resulting from trailing commas etc.
-        .join(', ');
-    };
-
-   // Function to format address display based on the required format
-   // Example Target: Flat 1, Lower Budock Mill, Hill Head, Penryn
-   const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
-     if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
-
-     let addressPart = fullAddressString;
-
-     // 1. Remove Postcode (if provided and found)
-     if (postcode) {
-       // Regex to match postcode potentially with space, followed by optional comma and whitespace at the end of the string
-       const postcodeRegex = new RegExp(`\\s*,?\\s*${postcode.replace(/\s/g, '\\s?')}\\s*$`, 'i');
-       addressPart = addressPart.replace(postcodeRegex, '');
-     }
-
-     // 2. Remove common county names (case-insensitive, whole word, followed by optional comma and space, usually at the end)
-     const counties = ['Cornwall', 'Devon'];
-     counties.forEach(county => {
-       const countyRegex = new RegExp(`\\s*,?\\s*\\b${county}\\b\\s*$`, 'gi');
-       addressPart = addressPart.replace(countyRegex, '');
-     });
-
-     // 3. Remove UPRN if present (assuming it's numeric and at the end, after a comma)
-     addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim();
-
-     // 4. Remove trailing commas and whitespace resulting from removals
-     addressPart = addressPart.replace(/,\s*$/, '').trim();
-
-     // 5. Apply Title Case (preserving existing commas)
-     return titleCase(addressPart);
-   };
-
 
 
   return (
@@ -320,3 +329,4 @@ export default function PostcodePage() {
     </div>
   );
 }
+

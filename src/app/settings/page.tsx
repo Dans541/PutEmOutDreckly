@@ -14,6 +14,77 @@ import { useToast } from '@/hooks/use-toast';
 import { type Address } from '@/services/cornwall-council-api';
 import { Separator } from '@/components/ui/separator';
 
+
+// Helper function for Title Case, preserving commas and handling mixed case input
+const titleCase = (str: string): string => {
+    if (!str) return '';
+    // Convert the whole string to lower case first to handle potential all-caps parts
+    const lowerCaseStr = str.toLowerCase();
+    // Split by comma, title case each part, join with ", "
+    return lowerCaseStr
+      .split(',')
+      .map(part =>
+        part
+          .trim()
+          .split(' ')
+          .map(word => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
+          .join(' ')
+      )
+      .filter(part => part.length > 0) // Remove empty parts resulting from trailing commas etc.
+      .join(', '); // Join parts with ", "
+};
+
+// Function to format postcode with a space
+const formatPostcode = (postcode: string): string => {
+    if (!postcode || typeof postcode !== 'string') return postcode; // Return original if invalid
+    const cleanedPostcode = postcode.toUpperCase().replace(/\s/g, '');
+    // Ensure it looks like a UK postcode before formatting (basic check)
+    if (cleanedPostcode.length < 5 || cleanedPostcode.length > 7) return postcode; // Return original if length is wrong
+    // Insert space before the last 3 characters
+    const outward = cleanedPostcode.slice(0, -3);
+    const inward = cleanedPostcode.slice(-3);
+    return `${outward} ${inward}`;
+};
+
+// Function to format address display based on the required format
+// Example Target: Flat 1, Lower Budock Mill, Hill Head, Penryn
+const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
+    if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
+
+    let addressPart = fullAddressString;
+
+    // 1. Remove Postcode (if provided and found) - more robust regex
+    if (postcode) {
+        // Regex to match postcode potentially with space, optionally preceded by a comma and whitespace, at the end of the string
+        const postcodeRegex = new RegExp(`(?:,\\s*)?${postcode.replace(/\s/g, '\\s?')}\\s*$`, 'i');
+        addressPart = addressPart.replace(postcodeRegex, '').trim();
+        // Remove trailing comma if postcode removal left one
+        addressPart = addressPart.replace(/,\s*$/, '').trim();
+    }
+
+    // 2. Remove common county names (case-insensitive, whole word, preceded by optional comma and space, usually at the end)
+    const counties = ['Cornwall', 'Devon']; // Add more if needed
+    counties.forEach(county => {
+        // Match the county, optionally preceded by a comma and whitespace, at the very end of the string
+        const countyRegex = new RegExp(`(?:,\\s*)?\\b${county}\\b\\s*$`, 'gi');
+        addressPart = addressPart.replace(countyRegex, '').trim();
+        // Remove trailing comma if county removal left one
+        addressPart = addressPart.replace(/,\s*$/, '').trim();
+    });
+
+
+    // 3. Remove UPRN if present (assuming it's numeric and at the end, potentially after a comma)
+    // This might be redundant if the API doesn't include it, but safe to keep
+    addressPart = addressPart.replace(/(?:,\s*)?\d{10,12}\s*$/, '').trim();
+    // Remove trailing comma if UPRN removal left one
+    addressPart = addressPart.replace(/,\s*$/, '').trim();
+
+
+    // 4. Apply Title Case using the refined helper
+    return titleCase(addressPart);
+};
+
+
 export default function SettingsPage() {
   const {
     favourites,
@@ -43,61 +114,6 @@ export default function SettingsPage() {
        router.replace('/postcode');
      }
    }, [isClient, addressLoading, favourites, selectedAddress, router]);
-
-    // Helper function for Title Case
-    const titleCase = (str: string): string => {
-        if (!str) return '';
-        // Handle potential all-caps input from API by converting to lower first
-        return str.toLowerCase()
-          .split(/[\s,]+/) // Split by space or comma
-          .map(word => {
-            if (word.length > 0) {
-              // Capitalize first letter
-              return word.charAt(0).toUpperCase() + word.slice(1);
-            }
-            return '';
-          })
-          .join(' '); // Rejoin with spaces
-      };
-
-
-   // Function to format postcode with a space
-   const formatPostcode = (postcode: string): string => {
-     if (!postcode || typeof postcode !== 'string' || postcode.length < 4) return postcode;
-     // Ensure it's uppercase and remove existing spaces
-     const cleanedPostcode = postcode.toUpperCase().replace(/\s/g, '');
-     // Insert space before the last 3 characters
-     const outward = cleanedPostcode.slice(0, -3);
-     const inward = cleanedPostcode.slice(-3);
-     return `${outward} ${inward}`;
-   };
-
-    // Function to format address display based on the required format: "Flat number, House Name, Road Name"
-    const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
-      if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
-      if (!postcode) return titleCase(fullAddressString); // Fallback if postcode is missing
-
-      // 1. Remove Postcode (assuming UK format, potentially with or without space)
-      const postcodeRegex = new RegExp(`\\s*${postcode.replace(/\s/g, '\\s?')}\\s*,?`, 'i');
-      let addressPart = fullAddressString.replace(postcodeRegex, '');
-
-      // 2. Remove common county names (add more if needed)
-      const counties = ['Cornwall', 'Devon']; // Example list
-      counties.forEach(county => {
-         // Match whole word, case-insensitive, followed by optional comma and space
-        const countyRegex = new RegExp(`\\b${county}\\b\\s*,?`, 'gi');
-        addressPart = addressPart.replace(countyRegex, '');
-      });
-
-      // 3. Remove trailing commas and whitespace
-      addressPart = addressPart.replace(/,\s*$/, '').trim();
-
-      // 4. Remove UPRN if present (assuming it's numeric and at the end)
-      addressPart = addressPart.replace(/,\s*\d{10,12}$/, '').trim(); // Regex for comma + space + 10-12 digits at the end
-
-      // 5. Apply Title Case
-      return titleCase(addressPart);
-    };
 
 
   const handleSelectFavourite = (fav: Address) => {
@@ -263,3 +279,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
