@@ -21,7 +21,7 @@ import {
   FormMessage, // Removed FormLabel
 } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, MapPin, Check, Trash2 } from 'lucide-react';
+import { Loader2, Search, MapPin, Check, Trash2 } from 'lucide-react'; // Added Trash2 back just in case
 import { useToast } from '@/hooks/use-toast';
 import { PostcodeIllustration } from '@/components/postcode-illustration'; // Import the illustration
 
@@ -58,27 +58,24 @@ const titleCase = (str: string): string => {
 
 
 // Function to format address display based on the required format
-// Example Target: Flat 1, Lower Budock Mill, Hill Head, Penryn
+// Updated with user-provided code
 const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
     if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
 
     let addressPart = fullAddressString;
 
-    // 1. Remove Postcode (if provided and found at the end) - More robust regex
+    // 1. Remove Postcode (if provided and found at the end)
     if (postcode) {
-        // Match optional comma, optional space, postcode (with optional internal space), optional space, $END
         const postcodeRegexEnd = new RegExp(`\\s*,?\\s*${postcode.slice(0, -3)}\\s?${postcode.slice(-3)}\\s*$`, 'i');
         addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
     }
 
-     // 2. Remove common county names (case-insensitive, whole word, preceded by comma and space, at the end)
-     const counties = ['Cornwall', 'Devon']; // Add more if needed
-     counties.forEach(county => {
-       // Match specifically ", county" or ", COUNTY" at the end
-       const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'gi');
-       addressPart = addressPart.replace(countyRegex, '').trim();
-     });
-
+    // 2. Remove common county names (case-insensitive, whole word, preceded by comma and space, at the end)
+    const counties = ['Cornwall', 'Devon']; // Add more if needed
+    counties.forEach(county => {
+        const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'gi');
+        addressPart = addressPart.replace(countyRegex, '').trim();
+    });
 
     // 3. Remove UPRN if present (assuming it's numeric, 10-12 digits, preceded by comma and space, at the end)
     addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim();
@@ -86,9 +83,17 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
     // 4. Remove any remaining trailing commas and whitespace
     addressPart = addressPart.replace(/,\s*$/, '').trim();
 
-    // 5. Apply Title Case (using the space-based title case function)
-    // Then, ensure commas are followed by a space for consistent formatting.
-    return titleCase(addressPart).replace(/,(?=\S)/g, ', '); // Add space after comma if missing
+    // 5. Split into parts, trim each, remove blanks and deduplicate
+    let parts = addressPart.split(',').map(p => p.trim()).filter(Boolean);
+
+    // 6. Optionally, limit to the first 4-5 parts (to avoid very long addresses)
+    // parts = parts.slice(0, 5);
+
+    // 7. Apply Title Case to each part
+    parts = parts.map(titleCase);
+
+    // 8. Rejoin with ', '
+    return parts.join(', ');
 };
 
 
@@ -110,9 +115,24 @@ export default function PostcodePage() {
     },
   });
 
-   // Initial routing is handled by SplashScreen.
-   // If the user navigates here after the app has loaded,
-   // we assume it's intentional (e.g., from settings or add new).
+   // Effect to check if navigation should happen (e.g., user manually navigated here)
+   useEffect(() => {
+     // Don't interfere if address context is still loading
+     if (addressLoading) return;
+
+     // If user lands here, has a selected address, and IS NOT coming back
+     // from settings (which we infer by checking showAddressList state), redirect to dashboard.
+     // This prevents redirect loops when clicking "Add New Address" from settings.
+     if (selectedAddress && !showAddressList) {
+       console.log("PostcodePage: Selected address exists and not currently showing list, redirecting to dashboard.");
+       // Use replace to avoid adding postcode page to history unnecessarily
+       router.replace('/dashboard');
+     }
+     // If no selected address, but favourites exist, stay here.
+     // If no selected address and no favourites, stay here.
+
+     // The SplashScreen handles the initial routing logic based on stored context.
+   }, [addressLoading, selectedAddress, router, showAddressList]); // Added showAddressList dependency
 
   const onSubmit: SubmitHandler<PostcodeFormData> = async (data) => {
     const searchPostcode = data.postcode;
@@ -322,11 +342,3 @@ export default function PostcodePage() {
     </div>
   );
 }
-
-// --- Test Function ---
-// You can call this test function from a suitable place, e.g., temporarily in useEffect or a button click ---
-// useEffect(() => {
-//     // Import and call the test function from lib
-//     import('@/lib/address-format-test').then(module => module.runAddressFormattingTest('TR10 8JT'));
-// }, []);
-// -------------------------------------------------------------------------------------------------------------

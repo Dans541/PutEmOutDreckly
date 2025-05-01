@@ -22,28 +22,24 @@ const titleCase = (str: string): string => {
 };
 
 
-// Function to format address display (Copied from postcode/page.tsx)
-// Example Target: Flat 1, Lower Budock Mill, Hill Head, Penryn
+// Function to format address display (Updated with user-provided code)
 const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
     if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
 
     let addressPart = fullAddressString;
 
-    // 1. Remove Postcode (if provided and found at the end) - More robust regex
+    // 1. Remove Postcode (if provided and found at the end)
     if (postcode) {
-        // Match optional comma, optional space, postcode (with optional internal space), optional space, $END
         const postcodeRegexEnd = new RegExp(`\\s*,?\\s*${postcode.slice(0, -3)}\\s?${postcode.slice(-3)}\\s*$`, 'i');
         addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
     }
 
-     // 2. Remove common county names (case-insensitive, whole word, preceded by comma and space, at the end)
-     const counties = ['Cornwall', 'Devon']; // Add more if needed
-     counties.forEach(county => {
-       // Match specifically ", county" or ", COUNTY" at the end
-       const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'gi');
-       addressPart = addressPart.replace(countyRegex, '').trim();
-     });
-
+    // 2. Remove common county names (case-insensitive, whole word, preceded by comma and space, at the end)
+    const counties = ['Cornwall', 'Devon']; // Add more if needed
+    counties.forEach(county => {
+        const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'gi');
+        addressPart = addressPart.replace(countyRegex, '').trim();
+    });
 
     // 3. Remove UPRN if present (assuming it's numeric, 10-12 digits, preceded by comma and space, at the end)
     addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim();
@@ -51,9 +47,17 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
     // 4. Remove any remaining trailing commas and whitespace
     addressPart = addressPart.replace(/,\s*$/, '').trim();
 
-    // 5. Apply Title Case (using the space-based title case function)
-    // Then, ensure commas are followed by a space for consistent formatting.
-    return titleCase(addressPart).replace(/,(?=\S)/g, ', '); // Add space after comma if missing
+    // 5. Split into parts, trim each, remove blanks and deduplicate
+    let parts = addressPart.split(',').map(p => p.trim()).filter(Boolean);
+
+    // 6. Optionally, limit to the first 4-5 parts (to avoid very long addresses)
+    // parts = parts.slice(0, 5);
+
+    // 7. Apply Title Case to each part
+    parts = parts.map(titleCase);
+
+    // 8. Rejoin with ', '
+    return parts.join(', ');
 };
 
 
@@ -177,5 +181,6 @@ export async function runAddressFormattingTest(postcode: string) {
 }
 
 // Example of how to run the test (e.g., from a script or dev environment)
-// runAddressFormattingTest('TR10 8JT');
+// Ensure this line is uncommented if you want the test to run when the file is loaded/imported.
+runAddressFormattingTest('TR10 8JT');
 // runAddressFormattingTest('TR11 2NG'); // Test another postcode
