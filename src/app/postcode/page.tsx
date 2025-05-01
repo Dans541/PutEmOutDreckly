@@ -21,7 +21,7 @@ import {
   FormMessage, // Removed FormLabel
 } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, MapPin, Check } from 'lucide-react'; // Changed icons
+import { Loader2, Search, MapPin, Check, Trash2 } from 'lucide-react'; // Added Trash2
 import { useToast } from '@/hooks/use-toast';
 import { PostcodeIllustration } from '@/components/postcode-illustration'; // Import the illustration
 
@@ -128,46 +128,52 @@ export default function PostcodePage() {
     }
   };
 
-    // Helper function for Title Case (copied from settings)
+    // Helper function for Title Case, preserving commas
     const titleCase = (str: string): string => {
-        if (!str) return '';
-        // Handle potential all-caps input from API by converting to lower first
-        return str.toLowerCase()
-          .split(/[\s,]+/) // Split by space or comma
-          .map(word => {
-            if (word.length > 0) {
-              // Capitalize first letter
-              return word.charAt(0).toUpperCase() + word.slice(1);
-            }
-            return '';
-          })
-          .join(' '); // Rejoin with spaces
-      };
+      if (!str) return '';
+      // Split by comma, title case each part, then join back with ", "
+      return str
+        .split(',')
+        .map(part =>
+          part
+            .trim()
+            .toLowerCase()
+            .split(' ')
+            .map(word => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : ''))
+            .join(' ')
+        )
+        .filter(part => part.length > 0) // Remove empty parts resulting from trailing commas etc.
+        .join(', ');
+    };
 
    // Function to format address display based on the required format
+   // Example Target: Flat 1, Lower Budock Mill, Hill Head, Penryn
    const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
      if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
-     if (!postcode) return titleCase(fullAddressString); // Fallback if postcode is missing
 
-     // 1. Remove Postcode (assuming UK format, potentially with or without space)
-     const postcodeRegex = new RegExp(`\\s*${postcode.replace(/\s/g, '\\s?')}\\s*,?`, 'i');
-     let addressPart = fullAddressString.replace(postcodeRegex, '');
+     let addressPart = fullAddressString;
 
-     // 2. Remove common county names (add more if needed)
-     const counties = ['Cornwall', 'Devon']; // Example list
+     // 1. Remove Postcode (if provided and found)
+     if (postcode) {
+       // Regex to match postcode potentially with space, followed by optional comma and whitespace at the end of the string
+       const postcodeRegex = new RegExp(`\\s*,?\\s*${postcode.replace(/\s/g, '\\s?')}\\s*$`, 'i');
+       addressPart = addressPart.replace(postcodeRegex, '');
+     }
+
+     // 2. Remove common county names (case-insensitive, whole word, followed by optional comma and space, usually at the end)
+     const counties = ['Cornwall', 'Devon'];
      counties.forEach(county => {
-        // Match whole word, case-insensitive, followed by optional comma and space
-       const countyRegex = new RegExp(`\\b${county}\\b\\s*,?`, 'gi');
+       const countyRegex = new RegExp(`\\s*,?\\s*\\b${county}\\b\\s*$`, 'gi');
        addressPart = addressPart.replace(countyRegex, '');
      });
 
-     // 3. Remove trailing commas and whitespace
+     // 3. Remove UPRN if present (assuming it's numeric and at the end, after a comma)
+     addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim();
+
+     // 4. Remove trailing commas and whitespace resulting from removals
      addressPart = addressPart.replace(/,\s*$/, '').trim();
 
-     // 4. Remove UPRN if present (assuming it's numeric and at the end)
-     addressPart = addressPart.replace(/,\s*\d{10,12}$/, '').trim(); // Regex for comma + space + 10-12 digits at the end
-
-     // 5. Apply Title Case
+     // 5. Apply Title Case (preserving existing commas)
      return titleCase(addressPart);
    };
 
@@ -287,7 +293,8 @@ export default function PostcodePage() {
                 >
                    {/* Icon changes color based on selection */}
                   <MapPin className={`h-5 w-5 shrink-0 ${selectedAddressInternal?.uprn === addr.uprn ? 'text-primary' : 'text-muted-foreground'}`} />
-                  <span className="flex-grow">{formatDisplayAddress(addr.address, addr.postcode)}</span> {/* Use new formatter */}
+                  {/* Display formatted address */}
+                  <span className="flex-grow">{formatDisplayAddress(addr.address, addr.postcode)}</span>
                    {/* "Selected" text aligned right */}
                   {selectedAddressInternal?.uprn === addr.uprn && (
                     <span className="text-primary text-sm ml-auto mr-1 flex items-center gap-1">
