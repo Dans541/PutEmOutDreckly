@@ -61,42 +61,6 @@ export default function SettingsPage() {
       };
 
 
-   // Function to format address display: "House Number Road Name, Town/City"
-    const formatDisplayAddress = (fullAddress: string): string => {
-        if (!fullAddress || typeof fullAddress !== 'string') return '';
-
-        const parts = fullAddress.split(',').map(part => part.trim()).filter(part => part);
-        if (parts.length === 0) return '';
-
-        // Remove postcode and county (case-insensitive)
-        const postcodeRegex = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i;
-        let relevantParts = parts.filter(part =>
-        !postcodeRegex.test(part) &&
-        part.toLowerCase() !== 'cornwall'
-        );
-
-        if (relevantParts.length === 0) {
-            // Fallback if only postcode/county existed in original parts
-            return titleCase(parts[0]);
-        }
-
-        // If only one relevant part remains, it's likely the street/building or town - return it title-cased
-        if(relevantParts.length === 1) {
-            return titleCase(relevantParts[0]);
-        }
-
-        // Assume the last part of relevantParts is the town
-        const town = titleCase(relevantParts[relevantParts.length - 1]);
-
-        // Assume everything before the town is the street address part
-        const streetParts = relevantParts.slice(0, -1); // Get all parts except the last (town)
-
-        // Join street parts back, handling potential multiple commas correctly, then title case
-        const streetAddress = titleCase(streetParts.join(', '));
-
-        return `${streetAddress}, ${town}`;
-    };
-
    // Function to format postcode with a space
    const formatPostcode = (postcode: string): string => {
      if (!postcode || typeof postcode !== 'string' || postcode.length < 4) return postcode;
@@ -107,6 +71,51 @@ export default function SettingsPage() {
      const inward = cleanedPostcode.slice(-3);
      return `${outward} ${inward}`;
    };
+
+    // Function to format address display: "Flat/Number, Building Name, Road Name"
+    // e.g., "Flat 1, Lower Budock Mill, Hill Head" or "21 Meadowbank Road"
+    const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
+      if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
+      if (!postcode || typeof postcode !== 'string') return titleCase(fullAddressString); // Fallback if postcode missing
+
+      // 1. Define patterns/words to remove (case-insensitive)
+      const postcodeRegex = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i;
+      // Add common towns/areas to help remove them - this list might need expanding
+      const knownTownsOrAreas = ['penryn', 'falmouth', 'truro', 'camborne', 'redruth', 'penzance', 'st austell', 'bodmin', 'newquay', 'helston', 'st ives', 'saltash', 'liskeard', 'launceston', 'hayle', 'torpoint', 'wadebridge', 'st just', 'bude', 'callington', 'padstow', 'fowey', 'lostwithiel', 'perranporth', 'mousehole', 'polzeath'];
+      const wordsToRemove = ['cornwall', ...knownTownsOrAreas];
+      const normalizedPostcode = postcode.toUpperCase().replace(/\s/g, ''); // For matching
+
+      // 2. Split the address string by spaces AND commas, trimming parts
+      const parts = fullAddressString.split(/[\s,]+/).map(part => part.trim()).filter(part => part);
+
+      // 3. Filter out unwanted parts
+      const relevantParts = parts.filter(part => {
+          const lowerPart = part.toLowerCase();
+          // Remove postcode (allow with or without space)
+          if (postcodeRegex.test(part)) return false;
+          // Remove normalized postcode if it got split differently
+          if (part.toUpperCase().replace(/\s/g, '') === normalizedPostcode) return false;
+          // Remove known words like 'Cornwall' and common towns/areas
+          if (wordsToRemove.includes(lowerPart)) return false;
+          // Remove potential trailing UPRN (though it should be separate)
+          if (/^\d{10,}$/.test(part)) return false; // Basic check for long numbers
+          return true;
+      });
+
+      // 4. Join the remaining parts and apply Title Case
+      let formattedAddress = titleCase(relevantParts.join(' '));
+
+      // 5. If the result is empty, fallback to the original string (title-cased, first part)
+      if (!formattedAddress) {
+          formattedAddress = titleCase(fullAddressString.split(',')[0] || fullAddressString); // Fallback
+      }
+
+      // 6. Specific formatting for "Flat X, ..."
+      // Ensure comma after flat number if followed by a letter (start of name/road)
+      formattedAddress = formattedAddress.replace(/^(Flat \d+) ([A-Za-z])/i, '$1, $2');
+
+      return formattedAddress;
+    };
 
 
   const handleSelectFavourite = (fav: Address) => {
@@ -182,12 +191,12 @@ export default function SettingsPage() {
                        <button
                          className="flex-grow flex items-center gap-3 text-left group"
                          onClick={() => handleSelectFavourite(fav)}
-                         aria-label={`Select address: ${formatDisplayAddress(fav.address)}. ${selectedAddress?.uprn === fav.uprn ? 'Currently selected.' : ''}`}
+                         aria-label={`Select address: ${formatDisplayAddress(fav.address, fav.postcode)}. ${selectedAddress?.uprn === fav.uprn ? 'Currently selected.' : ''}`}
                        >
                           <MapPin className={`h-5 w-5 shrink-0 ${selectedAddress?.uprn === fav.uprn ? 'text-primary' : 'text-muted-foreground'}`} />
                           <div className="flex-grow min-w-0"> {/* Added min-w-0 for proper truncation */}
                            <span className={`block text-sm truncate ${selectedAddress?.uprn === fav.uprn ? 'font-semibold text-primary' : 'text-foreground'}`}>
-                              {formatDisplayAddress(fav.address)} {/* Use formatted address */}
+                              {formatDisplayAddress(fav.address, fav.postcode)} {/* Use formatted address */}
                            </span>
                            <span className="block text-xs text-muted-foreground">{formatPostcode(fav.postcode)}</span> {/* Use formatted postcode */}
                          </div>
@@ -201,7 +210,7 @@ export default function SettingsPage() {
                         size="icon"
                         className="text-muted-foreground hover:text-destructive h-8 w-8 shrink-0"
                         onClick={(e) => { e.stopPropagation(); handleDeleteFavourite(fav.uprn); }}
-                        aria-label={`Remove ${formatDisplayAddress(fav.address)} from favourites`}
+                        aria-label={`Remove ${formatDisplayAddress(fav.address, fav.postcode)} from favourites`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

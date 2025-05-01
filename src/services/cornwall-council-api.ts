@@ -5,23 +5,6 @@
 // Base URL for the custom Glitch API
 const API_BASE_URL = 'https://closed-titanium-baboon.glitch.me/api';
 
-/**
- * Represents an address, including the postcode used to find it.
- */
-export interface Address {
-  /**
-   * The unique ID of the address.
-   */
-  uprn: string;
-  /**
-   * The full address string.
-   */
-  address: string;
-  /**
-   * The postcode used to search for this address.
-   */
-  postcode: string;
-}
 
 /**
  * Represents bin collection dates fetched from the API.
@@ -43,7 +26,7 @@ export interface BinCollectionData {
  * @returns A promise that resolves to an array of Address objects, including the postcode.
  * @throws {Error} If the API request fails or returns an error.
  */
-export async function getAddressesByPostcode(postcode: string): Promise<Omit<Address, 'postcode'>[]> {
+export async function getAddressesByPostcode(postcode: string): Promise<{ address: string; uprn: string; postcode: string; }[]> {
   const normalizedPostcode = postcode.trim();
   if (!normalizedPostcode) {
     throw new Error('Postcode cannot be empty.');
@@ -64,18 +47,18 @@ export async function getAddressesByPostcode(postcode: string): Promise<Omit<Add
       console.error('API Error Response:', errorData);
       throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorData?.error || 'Unknown error'}`);
     }
-
+    
     const data = await response.json();
-
+    
     if (!data || !Array.isArray(data.addresses)) {
       console.warn('API response did not contain an addresses array:', data);
-      return []; // Return empty array if addresses format is unexpected
+      throw new Error('API response did not contain an addresses array');
     }
-
+    
     console.log('Successfully fetched addresses:', data.addresses);
-    // The API returns { address: string, uprn: string } objects.
-    // The postcode will be added by the calling component (PostcodePage).
-    return data.addresses as Omit<Address, 'postcode'>[];
+   
+    return data.addresses.map((addressData: { address: string, uprn: string }) => { return { ...addressData, postcode: normalizedPostcode }; });
+      
 
   } catch (error) {
     console.error('Error fetching addresses from Glitch API:', error);
