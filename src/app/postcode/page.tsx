@@ -21,7 +21,7 @@ import {
   FormMessage, // Removed FormLabel
 } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, MapPin, Check, Trash2 } from 'lucide-react'; // Import Trash2
+import { Loader2, Search, MapPin, Check } from 'lucide-react'; // Removed unused Trash2
 import { useToast } from '@/hooks/use-toast';
 import { PostcodeIllustration } from '@/components/postcode-illustration'; // Import the illustration
 
@@ -112,7 +112,7 @@ export default function PostcodePage() {
   const [isSubmitting, setIsSubmitting] = useState(false); // For confirm button loading
   const [showAddressList, setShowAddressList] = useState(false);
   const [lastSearchedPostcode, setLastSearchedPostcode] = useState<string>(''); // Store the searched postcode
-  const { setAddress, addFavourite, favourites, loading: addressLoading, selectedAddress } = useAddress();
+  const { setAddress, addFavourite, favourites, loading: addressLoading } = useAddress(); // Removed selectedAddress from here as it caused redirect issue
   const router = useRouter();
   const { toast } = useToast();
 
@@ -123,27 +123,10 @@ export default function PostcodePage() {
     },
   });
 
-   // Effect to check if navigation should happen (e.g., user manually navigated here)
-   useEffect(() => {
-     // Don't interfere if address context is still loading
-     if (addressLoading) return;
-
-     // If user lands here, has a selected address, and IS NOT coming back
-     // from settings (which we infer by checking showAddressList state), redirect to dashboard.
-     // This prevents redirect loops when clicking "Add New Address" from settings.
-     // --- MODIFICATION: Prevent redirect if showAddressList is true ---
-     if (selectedAddress && !showAddressList) {
-       console.log("PostcodePage: Selected address exists and not currently showing list, redirecting to dashboard.");
-       // Use replace to avoid adding postcode page to history unnecessarily
-       router.replace('/dashboard');
-     }
-     // --- END MODIFICATION ---
-
-     // If no selected address, but favourites exist, stay here.
-     // If no selected address and no favourites, stay here.
-
-     // The SplashScreen handles the initial routing logic based on stored context.
-   }, [addressLoading, selectedAddress, router, showAddressList]); // Added showAddressList dependency
+   // Removed the useEffect that caused the redirect issue.
+   // The SplashScreen handles the initial navigation based on whether an address
+   // is already selected or if favourites exist. Navigating to this page
+   // (e.g., from Settings) should always show the postcode input.
 
   const onSubmit: SubmitHandler<PostcodeFormData> = async (data) => {
     const searchPostcode = data.postcode;
@@ -198,7 +181,7 @@ export default function PostcodePage() {
         addFavourite(selectedAddressInternal);
         // Delay slightly to show loading feedback
         setTimeout(() => {
-            router.push('/dashboard');
+            router.push('/dashboard'); // Navigate to dashboard after confirmation
             // No need to setIsSubmitting(false) as we navigate away
         }, 300);
     } else {
@@ -353,3 +336,4 @@ export default function PostcodePage() {
     </div>
   );
 }
+
