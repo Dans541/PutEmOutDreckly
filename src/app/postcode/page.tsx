@@ -40,73 +40,77 @@ const postcodeSchema = z.object({
 
 type PostcodeFormData = z.infer<typeof postcodeSchema>;
 
-// Helper function for Title Case, splitting by space
-const titleCase = (str: string): string => {
-    if (!str) return '';
-    // Convert to lower case first to handle ALL CAPS input
-    return str.toLowerCase().split(' ').map(word => {
-        if (word.length === 0) return '';
-        // Handle cases like "(part Of)" -> "(Part Of)"
-        if (word.startsWith('(') && word.endsWith(')')) {
-            const inner = word.slice(1, -1);
-            return `(${titleCase(inner)})`; // Recursively title case inner part
-        }
-        // Handle numbers like '3' in '3 Hill Head' - keep them as numbers
-        if (/^\d+$/.test(word)) {
-            return word;
-        }
-        return word.charAt(0).toUpperCase() + word.slice(1);
-    }).join(' ');
-};
-
-
 // Function to format address display based on the required format
-// Updated with user-provided code (2024-07-26) and further corrections
+// Updated implementation as requested
 const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
-    if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
+  if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
 
-    let addressPart = fullAddressString;
+  let addressPart = fullAddressString;
 
-    // 1. Remove Postcode (if provided and found at the end)
-    if (postcode) {
-        // Make regex more robust for postcodes like 'TR108JT' or 'TR10 8JT'
-        const pcOut = postcode.slice(0, -3);
-        const pcIn = postcode.slice(-3);
-        // Regex to match the postcode possibly preceded by a comma and/or space, at the very end of the string
-        const postcodeRegexEnd = new RegExp(`(?:,\\s*)?\\b${pcOut}\\s?${pcIn}\\b\\s*$`, 'i');
-        addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
-    }
+  // 1. Remove postcode (if present)
+  if (postcode) {
+    // Normalize postcode for regex (remove spaces, uppercase)
+    const normalizedPostcode = postcode.replace(/\s+/g, '').toUpperCase();
+    // Match postcode potentially with space, surrounded by word boundaries or start/end of string/comma
+    const postcodeRegex = new RegExp(`(?:^|,|\\s)${normalizedPostcode.slice(0,-3)}\\s?${normalizedPostcode.slice(-3)}(?:$|,|\\s)`, 'gi');
+    addressPart = addressPart.replace(postcodeRegex, ' ').trim(); // Replace with space to handle adjacent commas
+  }
 
-    // 2. Remove common county names (case-insensitive, whole word, preceded by comma and space, at the end)
-    const counties = ['Cornwall', 'Devon']; // Add more if needed
-    counties.forEach(county => {
-        const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'i');
-        addressPart = addressPart.replace(countyRegex, '').trim();
-    });
 
-    // 3. Remove UPRN if present (assuming it's numeric, 10-12 digits, preceded by comma and space, at the end)
-    // The API response should already not have UPRN in the 'address' string itself, but this is a safeguard.
-    addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim();
+  // 2. Remove county names (e.g. Cornwall, Devon)
+  const counties = ['Cornwall', 'Devon'];
+  counties.forEach(county => {
+    const countyRegex = new RegExp(`\\b${county}\\b`, 'gi'); // Use 'gi' for global, case-insensitive
+    addressPart = addressPart.replace(countyRegex, '').trim();
+  });
 
-    // 4. Remove any remaining trailing commas and whitespace
-    addressPart = addressPart.replace(/,\s*$/, '').trim();
+   // 3. Remove UPRN (assuming numeric, 10-12 digits)
+   addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim(); // At the end
+   addressPart = addressPart.replace(/\b\d{10,12}\b/, '').trim(); // Anywhere else
 
-    // 5. Split into parts by comma, trim each part, and filter out empty parts.
-    let parts = addressPart.split(',')
-        .map(p => p.trim()) // Trim whitespace from each part
-        .filter(Boolean); // Remove empty strings
 
-    // 6. Limit to the first N relevant parts if needed (e.g., to avoid excessively long strings)
-    // Let's keep it reasonably long for now, e.g., 5 parts max. Adjust if needed.
-    // parts = parts.slice(0, 5);
+  // 4. Replace multiple spaces/commas with a single comma and space, clean up ends
+  addressPart = addressPart.replace(/[\s,]+/g, ', ').trim(); // Replace separators with ', '
+  addressPart = addressPart.replace(/^,\s*|,\s*$/g, '').trim(); // Remove leading/trailing commas
 
-    // 7. Apply Title Case to each part
-    parts = parts.map(titleCase);
 
-    // 8. Rejoin the parts with a comma and a space.
-    return parts.join(', ');
+  // 5. Split the address into parts
+  let parts = addressPart
+    .split(',') // Split by comma
+    .map(p => p.trim()) // Trim whitespace
+    .filter(Boolean); // Remove empty parts
+
+
+  // 6. Capitalise each word in each part (title case)
+  const titleCase = (str: string): string => {
+      if (!str) return '';
+      return str.toLowerCase().split(' ').map(word => {
+          if (word.length === 0) return '';
+          // Handle cases like "(part Of)" -> "(Part Of)"
+          if (word.startsWith('(') && word.endsWith(')')) {
+              const inner = word.slice(1, -1);
+              // Avoid infinite loop on empty inner content like '()'
+              return inner ? `(${titleCase(inner)})` : '()';
+          }
+          // Handle numbers like '3' in '3 Hill Head' - keep them as numbers
+          if (/^\d+$/.test(word)) {
+              return word;
+          }
+          // Handle mixed alpha-numeric like 'Flat 1A'
+          if (/^[a-zA-Z]+\d+[a-zA-Z]*$/.test(word) || /^\d+[a-zA-Z]+$/.test(word)) {
+             // Basic uppercase first letter, rest lower (could be improved for specific cases)
+             return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+          }
+          return word.charAt(0).toUpperCase() + word.slice(1);
+      }).join(' ');
+  };
+
+
+  parts = parts.map(titleCase);
+
+  // 7. Optionally limit to 4 elements: Flat, House, Street, Town
+  return parts.slice(0, 4).join(', ');
 };
-
 
 
 export default function PostcodePage() {
@@ -127,43 +131,41 @@ export default function PostcodePage() {
     },
   });
 
-   // Prevent redirect if user is actively trying to get to this page (e.g. from settings)
+   // Prevent redirect loop if we are already on the postcode page
    useEffect(() => {
-     if (!addressLoading && selectedAddress && !showAddressList) {
-       // If an address is already selected AND we haven't just performed a search
-       // that reveals the address list, redirect to dashboard.
-       // This prevents the flash of the postcode page when navigating back from settings
-       // while still allowing the user to reach this page to search again.
-       console.log("PostcodePage: Address already selected and not searching, redirecting to dashboard.");
-       // Check if the current path is ALREADY postcode to avoid loops if something goes wrong
-       if (window.location.pathname !== '/postcode') {
-        // router.replace('/dashboard'); // Re-enable if needed, but currently causes issues
-       }
+     const currentPath = window.location.pathname;
+     if (!addressLoading && selectedAddress && currentPath !== '/postcode' && !showAddressList) {
+       // Only redirect if NOT on postcode page and NOT actively showing search results
+       console.log("PostcodePage: Address selected, not searching, redirecting to dashboard.");
+       router.replace('/dashboard');
      }
    }, [addressLoading, selectedAddress, showAddressList, router]);
 
+
   const onSubmit: SubmitHandler<PostcodeFormData> = async (data) => {
     const searchPostcode = data.postcode;
-    setLastSearchedPostcode(searchPostcode); // Store the postcode used for the search
+    // Ensure postcode has a space for display consistency if needed later, but API uses no space
+    const normalizedPostcode = searchPostcode.toUpperCase().replace(/\s+/g, '');
+    setLastSearchedPostcode(normalizedPostcode); // Store the postcode used for the search (no space version)
     setIsLoading(true);
-    setShowAddressList(false);
+    setShowAddressList(false); // Reset view to postcode input initially
     setSelectedAddressInternal(null);
     setAddresses([]);
 
     try {
       // Fetch addresses - API returns { address: string, uprn: string }[]
-      const fetchedAddressesRaw = await getAddressesByPostcode(searchPostcode);
+      const fetchedAddressesRaw = await getAddressesByPostcode(normalizedPostcode);
 
-      // Add the searched postcode back to each address object
+      // Add the searched postcode back to each address object (store the NO SPACE version used for API calls)
       const fetchedAddresses = fetchedAddressesRaw.map(addr => ({
           ...addr,
-          postcode: searchPostcode // Add the postcode here
+          postcode: normalizedPostcode // Store the no-space postcode
       }));
 
 
       if (fetchedAddresses.length > 0) {
         setAddresses(fetchedAddresses);
-        setShowAddressList(true);
+        setShowAddressList(true); // Now show the address list
         const postcodeField = document.getElementById('postcode');
         if (postcodeField instanceof HTMLInputElement) {
            postcodeField.blur();
@@ -174,6 +176,7 @@ export default function PostcodePage() {
           description: `No addresses found for postcode ${searchPostcode}. Please check and try again.`,
           variant: 'destructive',
         });
+        setShowAddressList(false); // Stay on postcode input if no results
       }
     } catch (error) {
       console.error('Error fetching addresses:', error);
@@ -182,6 +185,7 @@ export default function PostcodePage() {
         description: error instanceof Error ? error.message : 'Failed to fetch addresses. Please try again later.',
         variant: 'destructive',
       });
+      setShowAddressList(false); // Stay on postcode input on error
     } finally {
       setIsLoading(false);
     }
@@ -207,6 +211,17 @@ export default function PostcodePage() {
       });
     }
   };
+
+   // Function to format postcode with a space for display only
+   const formatDisplayPostcode = (postcode: string): string => {
+    if (!postcode || typeof postcode !== 'string' || postcode.length < 4) return postcode;
+    // Ensure it's uppercase and remove existing spaces first for safety
+    const cleanedPostcode = postcode.toUpperCase().replace(/\s/g, '');
+    // Insert space before the last 3 characters
+    const outward = cleanedPostcode.slice(0, -3);
+    const inward = cleanedPostcode.slice(-3);
+    return `${outward} ${inward}`;
+   };
 
 
   return (
@@ -289,7 +304,7 @@ export default function PostcodePage() {
           <div className="relative mb-4">
             <Input
                 type="text"
-                value={`Addresses for ${lastSearchedPostcode}`} // Display searched postcode
+                value={`Addresses for ${formatDisplayPostcode(lastSearchedPostcode)}`} // Display searched postcode with space
                 readOnly
                 className="h-11 text-sm border bg-secondary text-muted-foreground pl-4 pr-10" // Style like a search bar
                 aria-label="Searched Postcode"
@@ -300,7 +315,7 @@ export default function PostcodePage() {
                 onClick={() => {
                     setShowAddressList(false); // Go back to postcode input
                     setSelectedAddressInternal(null); // Clear selection when going back
-                    form.reset({ postcode: lastSearchedPostcode }); // Reset form with last postcode
+                    form.reset({ postcode: formatDisplayPostcode(lastSearchedPostcode) }); // Reset form with last postcode (display version)
                 }}
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground"
                 aria-label="Search again"
@@ -350,4 +365,3 @@ export default function PostcodePage() {
     </div>
   );
 }
-

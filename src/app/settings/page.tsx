@@ -14,66 +14,76 @@ import { useToast } from '@/hooks/use-toast';
 import { type Address } from '@/services/cornwall-council-api';
 import { Separator } from '@/components/ui/separator';
 
-// Helper function for Title Case, splitting by space
-const titleCase = (str: string): string => {
-    if (!str) return '';
-    // Convert to lower case first to handle ALL CAPS input
-    return str.toLowerCase().split(' ').map(word => {
-        if (word.length === 0) return '';
-        // Handle cases like "(part Of)" -> "(Part Of)"
-        if (word.startsWith('(') && word.endsWith(')')) {
-            const inner = word.slice(1, -1);
-            return `(${titleCase(inner)})`; // Recursively title case inner part
-        }
-        // Handle numbers like '3' in '3 Hill Head' - keep them as numbers
-        if (/^\d+$/.test(word)) {
-            return word;
-        }
-        return word.charAt(0).toUpperCase() + word.slice(1);
-    }).join(' ');
-};
-
 // Function to format address display based on the required format
-// Uses the corrected version from postcode/page.tsx
+// Updated implementation as requested
 const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
-    if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
+  if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
 
-    let addressPart = fullAddressString;
+  let addressPart = fullAddressString;
 
-    // 1. Remove Postcode (if provided and found at the end)
-    if (postcode) {
-        const pcOut = postcode.slice(0, -3);
-        const pcIn = postcode.slice(-3);
-        const postcodeRegexEnd = new RegExp(`(?:,\\s*)?\\b${pcOut}\\s?${pcIn}\\b\\s*$`, 'i');
-        addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
-    }
+   // 1. Remove postcode (if present)
+   if (postcode) {
+     // Normalize postcode for regex (remove spaces, uppercase)
+     const normalizedPostcode = postcode.replace(/\s+/g, '').toUpperCase();
+     // Match postcode potentially with space, surrounded by word boundaries or start/end of string/comma
+     const postcodeRegex = new RegExp(`(?:^|,|\\s)${normalizedPostcode.slice(0,-3)}\\s?${normalizedPostcode.slice(-3)}(?:$|,|\\s)`, 'gi');
+     addressPart = addressPart.replace(postcodeRegex, ' ').trim(); // Replace with space to handle adjacent commas
+   }
 
-    // 2. Remove common county names (case-insensitive, whole word, preceded by comma and space, at the end)
-    const counties = ['Cornwall', 'Devon']; // Add more if needed
-    counties.forEach(county => {
-        const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'i');
-        addressPart = addressPart.replace(countyRegex, '').trim();
-    });
 
-    // 3. Remove UPRN if present (assuming it's numeric, 10-12 digits, preceded by comma and space, at the end)
-    addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim();
+   // 2. Remove county names (e.g. Cornwall, Devon)
+   const counties = ['Cornwall', 'Devon'];
+   counties.forEach(county => {
+     const countyRegex = new RegExp(`\\b${county}\\b`, 'gi'); // Use 'gi' for global, case-insensitive
+     addressPart = addressPart.replace(countyRegex, '').trim();
+   });
 
-    // 4. Remove any remaining trailing commas and whitespace
-    addressPart = addressPart.replace(/,\s*$/, '').trim();
+    // 3. Remove UPRN (assuming numeric, 10-12 digits)
+    addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim(); // At the end
+    addressPart = addressPart.replace(/\b\d{10,12}\b/, '').trim(); // Anywhere else
 
-    // 5. Split into parts by comma, trim each part, and filter out empty parts.
-    let parts = addressPart.split(',')
-        .map(p => p.trim())
-        .filter(Boolean);
 
-    // 6. Limit to the first N relevant parts if needed
-    // parts = parts.slice(0, 5);
+   // 4. Replace multiple spaces/commas with a single comma and space, clean up ends
+   addressPart = addressPart.replace(/[\s,]+/g, ', ').trim(); // Replace separators with ', '
+   addressPart = addressPart.replace(/^,\s*|,\s*$/g, '').trim(); // Remove leading/trailing commas
 
-    // 7. Apply Title Case to each part
-    parts = parts.map(titleCase);
 
-    // 8. Rejoin the parts with a comma and a space.
-    return parts.join(', ');
+   // 5. Split the address into parts
+   let parts = addressPart
+     .split(',') // Split by comma
+     .map(p => p.trim()) // Trim whitespace
+     .filter(Boolean); // Remove empty parts
+
+
+   // 6. Capitalise each word in each part (title case)
+   const titleCase = (str: string): string => {
+       if (!str) return '';
+       return str.toLowerCase().split(' ').map(word => {
+           if (word.length === 0) return '';
+           // Handle cases like "(part Of)" -> "(Part Of)"
+           if (word.startsWith('(') && word.endsWith(')')) {
+               const inner = word.slice(1, -1);
+               // Avoid infinite loop on empty inner content like '()'
+               return inner ? `(${titleCase(inner)})` : '()';
+           }
+           // Handle numbers like '3' in '3 Hill Head' - keep them as numbers
+           if (/^\d+$/.test(word)) {
+               return word;
+           }
+            // Handle mixed alpha-numeric like 'Flat 1A'
+           if (/^[a-zA-Z]+\d+[a-zA-Z]*$/.test(word) || /^\d+[a-zA-Z]+$/.test(word)) {
+              // Basic uppercase first letter, rest lower (could be improved for specific cases)
+              return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+           }
+           return word.charAt(0).toUpperCase() + word.slice(1);
+       }).join(' ');
+   };
+
+
+   parts = parts.map(titleCase);
+
+   // 7. Optionally limit to 4 elements: Flat, House, Street, Town
+   return parts.slice(0, 4).join(', ');
 };
 
 
