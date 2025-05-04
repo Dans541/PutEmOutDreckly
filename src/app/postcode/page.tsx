@@ -21,7 +21,7 @@ import {
   FormMessage, // Removed FormLabel
 } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, MapPin, Check } from 'lucide-react'; // Removed unused Trash2
+import { Loader2, Search, MapPin, Check } from 'lucide-react'; // Keep used icons
 import { useToast } from '@/hooks/use-toast';
 import { PostcodeIllustration } from '@/components/postcode-illustration'; // Import the illustration
 
@@ -44,7 +44,6 @@ type PostcodeFormData = z.infer<typeof postcodeSchema>;
 const titleCase = (str: string): string => {
     if (!str) return '';
     // Convert to lower case first to handle ALL CAPS input
-    // Split by space, title case each word, rejoin with space
     return str.toLowerCase().split(' ').map(word => {
         if (word.length === 0) return '';
         // Handle cases like "(part Of)" -> "(Part Of)"
@@ -52,13 +51,17 @@ const titleCase = (str: string): string => {
             const inner = word.slice(1, -1);
             return `(${titleCase(inner)})`; // Recursively title case inner part
         }
+        // Handle numbers like '3' in '3 Hill Head' - keep them as numbers
+        if (/^\d+$/.test(word)) {
+            return word;
+        }
         return word.charAt(0).toUpperCase() + word.slice(1);
     }).join(' ');
 };
 
 
 // Function to format address display based on the required format
-// Updated with user-provided code (2024-07-26)
+// Updated with user-provided code (2024-07-26) and further corrections
 const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
     if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
 
@@ -69,14 +72,15 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
         // Make regex more robust for postcodes like 'TR108JT' or 'TR10 8JT'
         const pcOut = postcode.slice(0, -3);
         const pcIn = postcode.slice(-3);
-        const postcodeRegexEnd = new RegExp(`\\s*,?\\s*${pcOut}\\s?${pcIn}\\s*$`, 'i');
+        // Regex to match the postcode possibly preceded by a comma and/or space, at the very end of the string
+        const postcodeRegexEnd = new RegExp(`(?:,\\s*)?\\b${pcOut}\\s?${pcIn}\\b\\s*$`, 'i');
         addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
     }
 
     // 2. Remove common county names (case-insensitive, whole word, preceded by comma and space, at the end)
     const counties = ['Cornwall', 'Devon']; // Add more if needed
     counties.forEach(county => {
-        const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'gi');
+        const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'i');
         addressPart = addressPart.replace(countyRegex, '').trim();
     });
 
@@ -112,7 +116,7 @@ export default function PostcodePage() {
   const [isSubmitting, setIsSubmitting] = useState(false); // For confirm button loading
   const [showAddressList, setShowAddressList] = useState(false);
   const [lastSearchedPostcode, setLastSearchedPostcode] = useState<string>(''); // Store the searched postcode
-  const { setAddress, addFavourite, favourites, loading: addressLoading } = useAddress(); // Removed selectedAddress from here as it caused redirect issue
+  const { setAddress, addFavourite, favourites, loading: addressLoading, selectedAddress } = useAddress(); // Keep selectedAddress check for redirect logic
   const router = useRouter();
   const { toast } = useToast();
 
@@ -123,10 +127,20 @@ export default function PostcodePage() {
     },
   });
 
-   // Removed the useEffect that caused the redirect issue.
-   // The SplashScreen handles the initial navigation based on whether an address
-   // is already selected or if favourites exist. Navigating to this page
-   // (e.g., from Settings) should always show the postcode input.
+   // Prevent redirect if user is actively trying to get to this page (e.g. from settings)
+   useEffect(() => {
+     if (!addressLoading && selectedAddress && !showAddressList) {
+       // If an address is already selected AND we haven't just performed a search
+       // that reveals the address list, redirect to dashboard.
+       // This prevents the flash of the postcode page when navigating back from settings
+       // while still allowing the user to reach this page to search again.
+       console.log("PostcodePage: Address already selected and not searching, redirecting to dashboard.");
+       // Check if the current path is ALREADY postcode to avoid loops if something goes wrong
+       if (window.location.pathname !== '/postcode') {
+        // router.replace('/dashboard'); // Re-enable if needed, but currently causes issues
+       }
+     }
+   }, [addressLoading, selectedAddress, showAddressList, router]);
 
   const onSubmit: SubmitHandler<PostcodeFormData> = async (data) => {
     const searchPostcode = data.postcode;

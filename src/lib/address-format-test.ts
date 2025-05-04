@@ -9,7 +9,6 @@ import { getAddressesByPostcode, type Address } from '@/services/cornwall-counci
 const titleCase = (str: string): string => {
     if (!str) return '';
     // Convert to lower case first to handle ALL CAPS input
-    // Split by space, title case each word, rejoin with space
     return str.toLowerCase().split(' ').map(word => {
         if (word.length === 0) return '';
         // Handle cases like "(part Of)" -> "(Part Of)"
@@ -17,12 +16,16 @@ const titleCase = (str: string): string => {
             const inner = word.slice(1, -1);
             return `(${titleCase(inner)})`; // Recursively title case inner part
         }
+        // Handle numbers like '3' in '3 Hill Head' - keep them as numbers
+        if (/^\d+$/.test(word)) {
+            return word;
+        }
         return word.charAt(0).toUpperCase() + word.slice(1);
     }).join(' ');
 };
 
 
-// Function to format address display (Updated with user-provided code)
+// Function to format address display (Updated with user-provided code and corrections)
 const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
     if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
 
@@ -30,14 +33,16 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
 
     // 1. Remove Postcode (if provided and found at the end)
     if (postcode) {
-        const postcodeRegexEnd = new RegExp(`\\s*,?\\s*${postcode.slice(0, -3)}\\s?${postcode.slice(-3)}\\s*$`, 'i');
+        const pcOut = postcode.slice(0, -3);
+        const pcIn = postcode.slice(-3);
+        const postcodeRegexEnd = new RegExp(`(?:,\\s*)?\\b${pcOut}\\s?${pcIn}\\b\\s*$`, 'i');
         addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
     }
 
     // 2. Remove common county names (case-insensitive, whole word, preceded by comma and space, at the end)
     const counties = ['Cornwall', 'Devon']; // Add more if needed
     counties.forEach(county => {
-        const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'gi');
+        const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'i');
         addressPart = addressPart.replace(countyRegex, '').trim();
     });
 
@@ -47,10 +52,12 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
     // 4. Remove any remaining trailing commas and whitespace
     addressPart = addressPart.replace(/,\s*$/, '').trim();
 
-    // 5. Split into parts, trim each, remove blanks and deduplicate
-    let parts = addressPart.split(',').map(p => p.trim()).filter(Boolean);
+    // 5. Split into parts by comma, trim each part, and filter out empty parts.
+    let parts = addressPart.split(',')
+        .map(p => p.trim())
+        .filter(Boolean);
 
-    // 6. Optionally, limit to the first 4-5 parts (to avoid very long addresses)
+    // 6. Optionally, limit to the first N relevant parts
     // parts = parts.slice(0, 5);
 
     // 7. Apply Title Case to each part
@@ -78,7 +85,7 @@ export async function runAddressFormattingTest(postcode: string) {
             console.log(`  UPRN: ${addr.uprn}, Formatted: "${formatted}"`);
 
             // Basic Validation: Check if formatted address contains postcode or county (it shouldn't)
-             if (postcode && formatted.toLowerCase().includes(postcode.toLowerCase())) {
+             if (postcode && formatted.toLowerCase().includes(postcode.toLowerCase().replace(' ',''))) { // Check against normalized postcode
                  console.error(`   [FAIL] UPRN ${addr.uprn}: Formatted address still contains postcode: "${formatted}"`);
                  success = false;
              }
@@ -90,6 +97,10 @@ export async function runAddressFormattingTest(postcode: string) {
                      // Disable failure for now to avoid false positives on street names like "Cornwall Road"
                      // success = false;
                  }
+                 // Check for the county name appearing anywhere else (might be too strict)
+                 // if (formatted.toLowerCase().match(`\\b${county}\\b`)) {
+                 //     console.warn(`   [WARN] UPRN ${addr.uprn}: Formatted address might contain county name "${county}" elsewhere: "${formatted}"`);
+                 // }
              });
              // Check for trailing comma
              if (formatted.endsWith(',')) {
@@ -111,6 +122,11 @@ export async function runAddressFormattingTest(postcode: string) {
                   console.error(`   [FAIL] UPRN ${addr.uprn}: Formatted address might be missing space after comma: "${formatted}"`);
                   success = false;
              }
+              // Check for leading comma
+              if (formatted.startsWith(',')) {
+                  console.error(`   [FAIL] UPRN ${addr.uprn}: Formatted address starts with a comma: "${formatted}"`);
+                  success = false;
+              }
         });
 
         // --- Specific checks based on TR10 8JT example ---

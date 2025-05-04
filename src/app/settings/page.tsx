@@ -18,7 +18,6 @@ import { Separator } from '@/components/ui/separator';
 const titleCase = (str: string): string => {
     if (!str) return '';
     // Convert to lower case first to handle ALL CAPS input
-    // Split by space, title case each word, rejoin with space
     return str.toLowerCase().split(' ').map(word => {
         if (word.length === 0) return '';
         // Handle cases like "(part Of)" -> "(Part Of)"
@@ -26,12 +25,16 @@ const titleCase = (str: string): string => {
             const inner = word.slice(1, -1);
             return `(${titleCase(inner)})`; // Recursively title case inner part
         }
+        // Handle numbers like '3' in '3 Hill Head' - keep them as numbers
+        if (/^\d+$/.test(word)) {
+            return word;
+        }
         return word.charAt(0).toUpperCase() + word.slice(1);
     }).join(' ');
 };
 
 // Function to format address display based on the required format
-// Updated with user-provided code (2024-07-26)
+// Uses the corrected version from postcode/page.tsx
 const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
     if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
 
@@ -39,22 +42,20 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
 
     // 1. Remove Postcode (if provided and found at the end)
     if (postcode) {
-        // Make regex more robust for postcodes like 'TR108JT' or 'TR10 8JT'
         const pcOut = postcode.slice(0, -3);
         const pcIn = postcode.slice(-3);
-        const postcodeRegexEnd = new RegExp(`\\s*,?\\s*${pcOut}\\s?${pcIn}\\s*$`, 'i');
+        const postcodeRegexEnd = new RegExp(`(?:,\\s*)?\\b${pcOut}\\s?${pcIn}\\b\\s*$`, 'i');
         addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
     }
 
     // 2. Remove common county names (case-insensitive, whole word, preceded by comma and space, at the end)
     const counties = ['Cornwall', 'Devon']; // Add more if needed
     counties.forEach(county => {
-        const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'gi');
+        const countyRegex = new RegExp(`,\\s*\\b${county}\\b\\s*$`, 'i');
         addressPart = addressPart.replace(countyRegex, '').trim();
     });
 
     // 3. Remove UPRN if present (assuming it's numeric, 10-12 digits, preceded by comma and space, at the end)
-    // The API response should already not have UPRN in the 'address' string itself, but this is a safeguard.
     addressPart = addressPart.replace(/,\s*\d{10,12}\s*$/, '').trim();
 
     // 4. Remove any remaining trailing commas and whitespace
@@ -62,11 +63,10 @@ const formatDisplayAddress = (fullAddressString: string | undefined, postcode: s
 
     // 5. Split into parts by comma, trim each part, and filter out empty parts.
     let parts = addressPart.split(',')
-        .map(p => p.trim()) // Trim whitespace from each part
-        .filter(Boolean); // Remove empty strings
+        .map(p => p.trim())
+        .filter(Boolean);
 
-    // 6. Limit to the first N relevant parts if needed (e.g., to avoid excessively long strings)
-    // Let's keep it reasonably long for now, e.g., 5 parts max. Adjust if needed.
+    // 6. Limit to the first N relevant parts if needed
     // parts = parts.slice(0, 5);
 
     // 7. Apply Title Case to each part
