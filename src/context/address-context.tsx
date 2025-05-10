@@ -31,7 +31,12 @@ function safeJsonParse<T>(key: string, defaultValue: T): T {
     const item = localStorage.getItem(key);
     if (item) {
       // Add basic validation if needed (e.g., check if parsed object has expected properties)
-      const parsed = JSON.parse(item);
+      let parsed;
+      try {
+        parsed = JSON.parse(item);
+      } catch (parseError) {
+        console.error(`Failed to parse JSON from localStorage for key "${key}":`, parseError);
+      }
        // Example validation for Address: check for uprn, address, postcode
       if (key === SELECTED_ADDRESS_KEY && parsed && typeof parsed.uprn === 'string' && typeof parsed.address === 'string' && typeof parsed.postcode === 'string') {
         return parsed as T;
@@ -44,15 +49,15 @@ function safeJsonParse<T>(key: string, defaultValue: T): T {
             return validFavourites as T;
          } else {
             console.warn(`Invalid items found in stored favourites for key ${key}. Resetting.`);
-            localStorage.removeItem(key); // Remove invalid data
+            safeJsonSet(key, defaultValue); // Remove invalid data by setting default
             return defaultValue;
          }
       }
       // Basic validation for number/boolean
        if (key === NOTIFICATION_TIME_KEY && typeof parsed === 'number') return parsed as T;
        if (key === NOTIFICATIONS_ENABLED_KEY && typeof parsed === 'boolean') return parsed as T;
-
        // If structure doesn't match expected, return default and remove invalid item
+       // This also handles cases where JSON.parse failed
        console.warn(`Invalid data structure found in localStorage for key ${key}. Resetting.`);
        localStorage.removeItem(key);
        return defaultValue;
@@ -68,6 +73,7 @@ function safeJsonParse<T>(key: string, defaultValue: T): T {
 // Helper function to safely set JSON in localStorage
 function safeJsonSet(key: string, value: unknown): void {
     try {
+        // Use removeItem if value is null or undefined
         if (value === null || value === undefined) {
             localStorage.removeItem(key);
         } else {
@@ -139,9 +145,9 @@ export function AddressProvider({ children }: { children: ReactNode }) {
    }, [notificationsEnabled, loading]);
 
 
-  const setAddress = (address: Address | null) => {
+  const setAddress = (address: Address | null) => {    
     setSelectedAddressState(address);
-    // No direct storage update here, handled by useEffect
+    safeJsonSet(SELECTED_ADDRESS_KEY, address); // Immediately persist to localStorage
   };
 
   const addFavourite = (address: Address) => {

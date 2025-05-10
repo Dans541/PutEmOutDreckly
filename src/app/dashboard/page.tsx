@@ -7,8 +7,8 @@ import { useAddress } from '@/context/address-context';
 import { getBinCollectionData, type BinCollectionData } from '@/services/cornwall-council-api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, isValid, differenceInDays, isToday, isTomorrow, formatRelative } from 'date-fns';
-import { Header } from '@/components/header'; // Use the existing header
+import { format, isValid, differenceInDays } from 'date-fns';
+import { Header } from '@/components/header';
 import { BinIcon } from '@/components/bin-icon'; // Use the BinIcon component
 import { DashboardIllustration } from '@/components/dashboard-illustration'; // Import illustration
 import { AlertCircle, RefreshCw } from 'lucide-react'; // Icons for error/retry
@@ -164,72 +164,83 @@ export default function DashboardPage() {
     </div>
   );
 
-
-  // --- Main Content ---
   return (
-    <div className="flex flex-col h-full bg-background">
-      {/* Integrate Header */}
-      <Header showBackButton={false} /> {/* Hamburger menu could be added to Header later */}
-
-      {isLoading ? (
-        renderSkeleton()
-      ) : error ? (
-         <div className="flex-grow flex flex-col"> {renderError()} </div>
-      ) : binData && selectedAddress ? (
-        <div className="flex-grow p-4 md:p-6 space-y-6 overflow-y-auto">
-           {/* Illustration Area */}
-          <div className="flex justify-center items-center mb-4">
-            <DashboardIllustration className="h-24 md:h-32 w-auto text-primary" />
-          </div>
-
-           {/* Next Collection Section */}
-           {nextCollection ? (
-             <div className="text-center mb-6 animate-fade-in">
-               <p className="text-sm text-muted-foreground mb-1">Next Collection</p>
-               <h1 className="text-2xl md:text-3xl font-semibold">
-                 {formatDate(nextCollection.date)}
-               </h1>
-               <p className="text-lg text-primary mt-1">{formatRelativeDays(nextCollection.date)}</p>
-             </div>
-           ) : (
-              <div className="text-center mb-6 animate-fade-in">
-                <p className="text-muted-foreground">No upcoming collections scheduled.</p>
-              </div>
-           )}
-
-
-           {/* Collection List */}
-           <div className="space-y-1 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            {collectionEntries.length > 0 ? (
-              collectionEntries.map((entry, index) => (
-                <div
-                  key={`${entry.type}-${index}`} // Use index in key for stability if types repeat
-                  className="flex items-center justify-between py-3 border-b last:border-b-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <BinIcon binType={entry.type} className="h-8 w-8" /> {/* Larger Icon */}
-                    <div>
-                      <p className="font-medium">{formatDate(entry.date)}</p>
-                      <p className="text-sm text-muted-foreground">{entry.name}</p>
-                    </div>
+    <>
+      <Header showBackButton={false} pageTitle={selectedAddress ? selectedAddress.address : 'Dashboard'} />
+      <div className="flex flex-col h-full bg-background">
+        {/* Conditional Rendering based on state */}
+        {isLoading ? (
+          renderSkeleton()
+        ) : error ? (
+          renderError()
+        ) : (
+          // Render dashboard content if data is loaded and no error
+          <div className="flex-grow flex flex-col">
+            {binData && selectedAddress ? ( // Ensure data and address are available
+              collectionEntries.length > 0 ? (
+                // Render collections if available
+                <div className="flex-grow p-4 md:p-6 space-y-4 overflow-y-auto">
+                  {/* Illustration Area */}
+                  <div className="flex justify-center items-center mb-4">
+                    <DashboardIllustration className="h-24 md:h-32 w-auto text-primary" />
                   </div>
-                  <span className="text-sm text-muted-foreground font-medium">
-                    {formatRelativeDays(entry.date)}
-                  </span>
+
+                  {/* Next Collection Card */}
+                  {nextCollection && (
+                    <Card className="animate-fade-in">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-center text-xl md:text-2xl font-semibold text-primary">
+                          Next Collection
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-center">
+                        <p className="text-2xl md:text-3xl font-bold mb-1">{formatDate(nextCollection.date)}</p>
+                        <p className="text-lg text-muted-foreground">{formatRelativeDays(nextCollection.date)}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                {/* Upcoming Collections Cards */}
+                <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                  {collectionEntries.map((entry, index) => (
+                    <Card
+                      key={`${entry.type}-${index}`} // Use index in key for stability if types repeat
+                      className="flex items-center justify-between p-4"
+                    >
+                      <div className="flex items-center gap-3">
+                        <BinIcon binType={entry.type} className="h-10 w-10 text-primary" />
+                        <div>
+                          <p className="font-medium">{formatDate(entry.date)}</p>
+                          <p className="text-sm text-muted-foreground">{entry.name}</p>
+                        </div>
+                      </div>
+                      <span className="text-sm text-muted-foreground font-medium">
+                        {formatRelativeDays(entry.date)}
+                      </span>
+                    </Card>
+                  ))}
                 </div>
-              ))
+                </div>
+              ) : (
+                // Render "No Upcoming Collections" message
+                <div className="flex flex-col flex-grow items-center justify-start text-center p-6 space-y-4">
+                  <DashboardIllustration className="h-24 md:h-32 w-auto text-primary mb-4" />
+                  <h2 className="text-xl font-semibold">No Upcoming Collections Soon!</h2>
+                  <p className="text-muted-foreground max-w-sm">
+                    You're all caught up with your bin collections for the near future. Check back later for updates.
+                  </p>
+                </div>
+              )
             ) : (
-              !isLoading && <p className="text-center text-muted-foreground pt-4">No collection data available.</p>
-            )}
-           </div>
-        </div>
-      ) : (
-         // Fallback if binData is null but no error (e.g., initial state before fetch)
-         <div className="flex flex-col flex-grow items-center justify-center">
-             <p className="text-muted-foreground">Loading collection data...</p>
-         </div>
-      )}
-    </div>
+              // Fallback or initial state before data or address is fully loaded/checked
+              <div className="flex flex-col flex-grow items-center justify-start text-center p-6 space-y-4">
+                 <p className="text-muted-foreground">Preparing dashboard...</p>
+               </div>
+             )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

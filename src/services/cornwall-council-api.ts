@@ -21,6 +21,14 @@ export interface BinCollectionData {
 }
 
 /**
+ * Represents an address returned by the API.
+ */
+export interface Address {
+  address: string;
+  uprn: string;
+  postcode: string;
+}
+/**
  * Fetches addresses for a given postcode from the Glitch API.
  * @param postcode The postcode to search for (case-insensitive).
  * @returns A promise that resolves to an array of Address objects, including the postcode.

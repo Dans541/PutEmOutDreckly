@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -17,118 +18,38 @@ import {
   FormControl,
   FormField,
   FormItem,
-  FormMessage, // Removed FormLabel
+  FormMessage,
 } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, MapPin, Check } from 'lucide-react'; // Keep used icons
+import { Loader2, Search, MapPin, Check, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { PostcodeIllustration } from '@/components/postcode-illustration'; // Import the illustration
+import { PostcodeIllustration } from '@/components/postcode-illustration';
+import { formatDisplayAddress } from '@/lib/address-utils'; // Import centralized formatter
 
-// Adjusted regex for better flexibility with spacing
 const postcodeSchema = z.object({
   postcode: z
     .string()
     .min(5, 'Postcode must be at least 5 characters')
     .max(8, 'Postcode cannot be more than 8 characters')
     .regex(
-      /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i, // Allow optional space
+      /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i,
       'Invalid UK postcode format'
     )
-    .transform(val => val.toUpperCase().replace(/\s+/g, '')), // Normalize before validation/use
+    .transform(val => val.toUpperCase().replace(/\s+/g, '')),
 });
 
 type PostcodeFormData = z.infer<typeof postcodeSchema>;
 
-const titleCase = (str: string): string => {
-  if (!str) return '';
-  return str.toLowerCase().split(' ').map(word => {
-    if (word.length === 0) return '';
-    if (word.startsWith('(') && word.endsWith(')')) {
-      const inner = word.slice(1, -1);
-      return inner ? `(${titleCase(inner)})` : '()';
-    }
-    if (/^\d+$/.test(word)) return word; // 3 -> 3
-
-    if (/^\d+[a-zA-Z]+$/.test(word)) { // 1a -> 1A, 1ab -> 1AB
-        const numPart = word.match(/^\d+/)?.[0] || '';
-        const letterPart = word.substring(numPart.length);
-        return numPart + letterPart.toUpperCase();
-    }
-    // Flat1a -> Flat1A, Complex2b -> Complex2B
-    if (/^[a-zA-Z]+\d+[a-zA-Z]+$/.test(word) || /^[a-zA-Z]+\d+$/.test(word)) {
-        let result = '';
-        let prevCharIsLetter = false;
-        for (let i = 0; i < word.length; i++) {
-            const char = word[i];
-            if (i === 0) {
-                result += char.toUpperCase();
-                prevCharIsLetter = !/\d/.test(char);
-            } else if (/\d/.test(char)) {
-                result += char;
-                prevCharIsLetter = false;
-            } else { // char is a letter
-                if (prevCharIsLetter) {
-                    result += char.toLowerCase();
-                } else { // previous char was a digit or start of word part
-                    result += char.toUpperCase();
-                }
-                prevCharIsLetter = true;
-            }
-        }
-        return result;
-    }
-    return word.charAt(0).toUpperCase() + word.slice(1);
-  }).join(' ');
-};
-
-
-const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
-  if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
-  let addressPart = fullAddressString;
-
-  // 1. Remove postcode (if present from the end, case-insensitive, flexible spacing)
-  if (postcode) {
-    const normalizedPostcode = postcode.replace(/\s+/g, '').toUpperCase();
-    const postcodeRegexEnd = new RegExp(`(?:\\s*,\\s*|\\s+)${normalizedPostcode.slice(0, -3)}\\s?${normalizedPostcode.slice(-3)}\\s*$`, 'gi');
-    addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
-  }
-
-  // 2. Remove county names (e.g. Cornwall, Devon) from the end
-  const counties = ['Cornwall', 'Devon'];
-  counties.forEach(county => {
-    const countyRegexEnd = new RegExp(`(?:\\s*,\\s*|\\s+)\\b${county}\\b\\s*$`, 'gi');
-    addressPart = addressPart.replace(countyRegexEnd, '').trim();
-  });
-
-  // 3. Remove UPRN (numeric, 10-12 digits, typically at the end)
-  addressPart = addressPart.replace(/(?:\s*,\s*|\s+)\d{10,12}\s*$/, '').trim();
-
-  // 4. Clean up string:
-  addressPart = addressPart.replace(/\s+/g, ' ').trim(); // Multiple spaces to single
-  addressPart = addressPart.replace(/\s*,\s*/g, ',').trim(); // Normalize space around commas
-  addressPart = addressPart.replace(/^,+|,+$/g, '').trim(); // Remove leading/trailing commas
-  addressPart = addressPart.replace(/,{2,}/g, ',').trim(); // Multiple commas to single
-
-  // 5. Split into main components by the cleaned comma
-  let components = addressPart.split(',')
-    .map(comp => comp.trim())
-    .filter(Boolean);
-
-  components = components.map(comp => titleCase(comp));
-
-  // 6. Limit to 4 parts and join with ', '
-  return components.slice(0, 4).join(', ');
-};
-
+// titleCase function is now in address-utils.ts and used by formatDisplayAddress
 
 export default function PostcodePage() {
-  const [addresses, setAddresses] = useState<Address[]>([]); // Store full Address object including postcode
-  const [selectedAddressInternal, setSelectedAddressInternal] = useState<Address | null>(null); // Renamed state variable
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressInternal, setSelectedAddressInternal] = useState<Address | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false); // For confirm button loading
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddressList, setShowAddressList] = useState(false);
-  const [lastSearchedPostcode, setLastSearchedPostcode] = useState<string>(''); // Store the searched postcode
-  const { setAddress, addFavourite, favourites, loading: addressLoading, selectedAddress } = useAddress(); // Keep selectedAddress check for redirect logic
+  const [lastSearchedPostcode, setLastSearchedPostcode] = useState<string>('');
+  const { setAddress, addFavourite, favourites, loading: addressLoading, selectedAddress } = useAddress();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -139,12 +60,9 @@ export default function PostcodePage() {
     },
   });
 
-   // Prevent redirect loop if we are already on the postcode page
    useEffect(() => {
      const currentPath = window.location.pathname;
      if (!addressLoading && selectedAddress && currentPath !== '/postcode' && !showAddressList) {
-       // Only redirect if NOT on postcode page and NOT actively showing search results
-       console.log("PostcodePage: Address selected, not searching, redirecting to dashboard.");
        router.replace('/dashboard');
      }
    }, [addressLoading, selectedAddress, showAddressList, router]);
@@ -152,28 +70,23 @@ export default function PostcodePage() {
 
   const onSubmit: SubmitHandler<PostcodeFormData> = async (data) => {
     const searchPostcode = data.postcode;
-    // Ensure postcode has a space for display consistency if needed later, but API uses no space
     const normalizedPostcode = searchPostcode.toUpperCase().replace(/\s+/g, '');
-    setLastSearchedPostcode(normalizedPostcode); // Store the postcode used for the search (no space version)
+    setLastSearchedPostcode(normalizedPostcode);
     setIsLoading(true);
-    setShowAddressList(false); // Reset view to postcode input initially
+    setShowAddressList(false);
     setSelectedAddressInternal(null);
     setAddresses([]);
 
     try {
-      // Fetch addresses - API returns { address: string, uprn: string }[]
       const fetchedAddressesRaw = await getAddressesByPostcode(normalizedPostcode);
-
-      // Add the searched postcode back to each address object (store the NO SPACE version used for API calls)
       const fetchedAddresses = fetchedAddressesRaw.map(addr => ({
           ...addr,
-          postcode: normalizedPostcode // Store the no-space postcode
+          postcode: normalizedPostcode
       }));
-
 
       if (fetchedAddresses.length > 0) {
         setAddresses(fetchedAddresses);
-        setShowAddressList(true); // Now show the address list
+        setShowAddressList(true);
         const postcodeField = document.getElementById('postcode');
         if (postcodeField instanceof HTMLInputElement) {
            postcodeField.blur();
@@ -184,7 +97,7 @@ export default function PostcodePage() {
           description: `No addresses found for postcode ${searchPostcode}. Please check and try again.`,
           variant: 'destructive',
         });
-        setShowAddressList(false); // Stay on postcode input if no results
+        setShowAddressList(false);
       }
     } catch (error) {
       console.error('Error fetching addresses:', error);
@@ -193,25 +106,22 @@ export default function PostcodePage() {
         description: error instanceof Error ? error.message : 'Failed to fetch addresses. Please try again later.',
         variant: 'destructive',
       });
-      setShowAddressList(false); // Stay on postcode input on error
+      setShowAddressList(false);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleConfirmSelection = () => {
-     setIsSubmitting(true); // Indicate loading on confirm button
-     if (selectedAddressInternal) { // Use the renamed state variable
-        // The selectedAddressInternal already includes the postcode from the mapping above
+     setIsSubmitting(true);
+     if (selectedAddressInternal) {
         setAddress(selectedAddressInternal);
         addFavourite(selectedAddressInternal);
-        // Delay slightly to show loading feedback
         setTimeout(() => {
-            router.push('/dashboard'); // Navigate to dashboard after confirmation
-            // No need to setIsSubmitting(false) as we navigate away
+            router.push('/dashboard');
         }, 300);
     } else {
-      setIsSubmitting(false); // Stop loading if selection is invalid
+      setIsSubmitting(false);
       toast({
         title: 'Selection Incomplete',
         description: 'Please select an address first.',
@@ -220,12 +130,9 @@ export default function PostcodePage() {
     }
   };
 
-   // Function to format postcode with a space for display only
-   const formatDisplayPostcode = (postcode: string): string => {
+   const formatPostcodeForDisplay = (postcode: string): string => {
     if (!postcode || typeof postcode !== 'string' || postcode.length < 4) return postcode;
-    // Ensure it's uppercase and remove existing spaces first for safety
     const cleanedPostcode = postcode.toUpperCase().replace(/\s/g, '');
-    // Insert space before the last 3 characters
     const outward = cleanedPostcode.slice(0, -3);
     const inward = cleanedPostcode.slice(-3);
     return `${outward} ${inward}`;
@@ -235,10 +142,9 @@ export default function PostcodePage() {
   return (
     <div className="flex flex-col h-full bg-background p-4 pt-8 md:pt-12">
       {!showAddressList ? (
-        // Initial Postcode Entry View
         <div className="flex flex-col flex-grow justify-between items-center text-center animate-fade-in">
           <div className="w-full max-w-xs mx-auto">
-             <PostcodeIllustration className="w-full h-auto mb-6" />
+             <PostcodeIllustration className="w-full h-auto mb-6" data-ai-hint="location map" />
              <h1 className="text-2xl font-semibold mb-2">Where are you?</h1>
              <p className="text-muted-foreground text-sm mb-8">
                Enter your postcode so we can find your collection schedule.
@@ -254,7 +160,6 @@ export default function PostcodePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                         {/* Input styled like BinDays */}
                          <div className="relative">
                            <Input
                              id="postcode"
@@ -262,7 +167,7 @@ export default function PostcodePage() {
                              {...field}
                              value={field.value || ''}
                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                             className="h-12 text-center text-lg border-2 focus:border-primary focus:ring-0" // Adjusted styling
+                             className="h-12 text-center text-lg border-2 focus:border-primary focus:ring-0"
                              aria-label="Postcode"
                              aria-describedby="postcode-error"
                              aria-invalid={!!form.formState.errors.postcode}
@@ -271,33 +176,28 @@ export default function PostcodePage() {
                              autoComplete="postal-code"
                              disabled={isLoading}
                            />
-                            {/* Conditionally render Search or Loader inside input */}
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
                               {isLoading ? (
                                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                               ) : (
-                                // Search icon only appears if not loading
                                 <Search className="h-5 w-5 text-muted-foreground" />
                               )}
                             </div>
                          </div>
-
                       </FormControl>
                       <FormMessage id="postcode-error" className="text-center" />
                     </FormItem>
                   )}
                 />
-                 {/* Button styled like BinDays */}
                 <Button
                   type="submit"
                   disabled={isLoading || !form.formState.isValid || form.getValues('postcode').length === 0}
-                  className="w-full h-12 text-lg font-semibold rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="w-full h-12 text-lg font-semibold"
                 >
                   {isLoading ? 'Searching...' : 'Search'}
                 </Button>
               </form>
             </Form>
-             {/* Link to favourites/settings if available */}
              {!addressLoading && favourites.length > 0 && (
                 <Button variant="link" onClick={() => router.push('/settings')} className="mt-4 text-sm text-primary">
                 View Saved Addresses
@@ -306,34 +206,31 @@ export default function PostcodePage() {
           </div>
         </div>
       ) : (
-        // Address Selection View
         <div className="flex flex-col flex-grow h-full animate-fade-in">
-           {/* Search Bar imitation */}
           <div className="relative mb-4">
             <Input
                 type="text"
-                value={`Addresses for ${formatDisplayPostcode(lastSearchedPostcode)}`} // Display searched postcode with space
+                value={`Addresses for ${formatPostcodeForDisplay(lastSearchedPostcode)}`}
                 readOnly
-                className="h-11 text-sm border bg-secondary text-muted-foreground pl-4 pr-10" // Style like a search bar
+                className="h-11 text-sm border bg-secondary text-muted-foreground pl-4 pr-10"
                 aria-label="Searched Postcode"
             />
              <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => {
-                    setShowAddressList(false); // Go back to postcode input
-                    setSelectedAddressInternal(null); // Clear selection when going back
-                    form.reset({ postcode: formatDisplayPostcode(lastSearchedPostcode) }); // Reset form with last postcode (display version)
+                    setShowAddressList(false);
+                    setSelectedAddressInternal(null);
+                    form.reset({ postcode: formatPostcodeForDisplay(lastSearchedPostcode) });
                 }}
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground"
                 aria-label="Search again"
               >
-                 <Search className="h-4 w-4" /> {/* Or use a Back/Edit icon */}
+                 <Search className="h-4 w-4" />
                </Button>
           </div>
 
-
-          <ScrollArea className="flex-grow mb-4 border-t border-b -mx-4 px-4"> {/* Make scroll area take space */}
+          <ScrollArea className="flex-grow mb-4 border-t border-b -mx-4 px-4">
             <div className="py-2">
               {addresses.map((addr) => (
                 <button
@@ -341,14 +238,11 @@ export default function PostcodePage() {
                   className={`w-full text-left py-3 px-1 flex items-center gap-3 border-b last:border-b-0 ${
                     selectedAddressInternal?.uprn === addr.uprn ? 'font-semibold text-primary' : 'text-foreground hover:bg-muted/50'
                   }`}
-                  onClick={() => setSelectedAddressInternal(addr)} // Use renamed state setter
+                  onClick={() => setSelectedAddressInternal(addr)}
                   aria-pressed={selectedAddressInternal?.uprn === addr.uprn}
                 >
-                   {/* Icon changes color based on selection */}
                   <MapPin className={`h-5 w-5 shrink-0 ${selectedAddressInternal?.uprn === addr.uprn ? 'text-primary' : 'text-muted-foreground'}`} />
-                  {/* Display formatted address */}
                   <span className="flex-grow">{formatDisplayAddress(addr.address, addr.postcode)}</span>
-                   {/* "Selected" text aligned right */}
                   {selectedAddressInternal?.uprn === addr.uprn && (
                     <span className="text-primary text-sm ml-auto mr-1 flex items-center gap-1">
                       <Check className="h-4 w-4" /> Selected
@@ -359,11 +253,11 @@ export default function PostcodePage() {
             </div>
           </ScrollArea>
 
-          <div className="mt-auto mb-4"> {/* Button at the bottom */}
+          <div className="mt-auto mb-4">
              <Button
                onClick={handleConfirmSelection}
-               disabled={!selectedAddressInternal || isSubmitting} // Use renamed state variable
-               className="w-full h-12 text-lg font-semibold rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+               disabled={!selectedAddressInternal || isSubmitting}
+               className="w-full h-12 text-lg font-semibold"
              >
                {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Confirm Selection'}
              </Button>

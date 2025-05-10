@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,93 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, BellRing, PlusCircle, Loader2, MapPin, Check } from 'lucide-react'; // Updated icons
+import { Trash2, PlusCircle, Loader2, MapPin, Check } from 'lucide-react';
 import { Header } from '@/components/header';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { type Address } from '@/services/cornwall-council-api';
-import { Separator } from '@/components/ui/separator';
+import { formatDisplayAddress } from '@/lib/address-utils'; // Import centralized formatter
 
-const titleCase = (str: string): string => {
-  if (!str) return '';
-  return str.toLowerCase().split(' ').map(word => {
-    if (word.length === 0) return '';
-    if (word.startsWith('(') && word.endsWith(')')) {
-      const inner = word.slice(1, -1);
-      return inner ? `(${titleCase(inner)})` : '()';
-    }
-    if (/^\d+$/.test(word)) return word; // 3 -> 3
-
-    if (/^\d+[a-zA-Z]+$/.test(word)) { // 1a -> 1A, 1ab -> 1AB
-        const numPart = word.match(/^\d+/)?.[0] || '';
-        const letterPart = word.substring(numPart.length);
-        return numPart + letterPart.toUpperCase();
-    }
-     // Flat1a -> Flat1A, Complex2b -> Complex2B
-    if (/^[a-zA-Z]+\d+[a-zA-Z]+$/.test(word) || /^[a-zA-Z]+\d+$/.test(word)) {
-        let result = '';
-        let prevCharIsLetter = false;
-        for (let i = 0; i < word.length; i++) {
-            const char = word[i];
-            if (i === 0) {
-                result += char.toUpperCase();
-                prevCharIsLetter = !/\d/.test(char);
-            } else if (/\d/.test(char)) {
-                result += char;
-                prevCharIsLetter = false;
-            } else { // char is a letter
-                if (prevCharIsLetter) {
-                    result += char.toLowerCase();
-                } else { // previous char was a digit or start of word part
-                    result += char.toUpperCase();
-                }
-                prevCharIsLetter = true;
-            }
-        }
-        return result;
-    }
-    return word.charAt(0).toUpperCase() + word.slice(1);
-  }).join(' ');
-};
-
-const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
-  if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
-  let addressPart = fullAddressString;
-
-  // 1. Remove postcode (if present from the end, case-insensitive, flexible spacing)
-  if (postcode) {
-    const normalizedPostcode = postcode.replace(/\s+/g, '').toUpperCase();
-    const postcodeRegexEnd = new RegExp(`(?:\\s*,\\s*|\\s+)${normalizedPostcode.slice(0, -3)}\\s?${normalizedPostcode.slice(-3)}\\s*$`, 'gi');
-    addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
-  }
-
-  // 2. Remove county names (e.g. Cornwall, Devon) from the end
-  const counties = ['Cornwall', 'Devon'];
-  counties.forEach(county => {
-    const countyRegexEnd = new RegExp(`(?:\\s*,\\s*|\\s+)\\b${county}\\b\\s*$`, 'gi');
-    addressPart = addressPart.replace(countyRegexEnd, '').trim();
-  });
-
-  // 3. Remove UPRN (numeric, 10-12 digits, typically at the end)
-  addressPart = addressPart.replace(/(?:\s*,\s*|\s+)\d{10,12}\s*$/, '').trim();
-
-  // 4. Clean up string:
-  addressPart = addressPart.replace(/\s+/g, ' ').trim(); // Multiple spaces to single
-  addressPart = addressPart.replace(/\s*,\s*/g, ',').trim(); // Normalize space around commas
-  addressPart = addressPart.replace(/^,+|,+$/g, '').trim(); // Remove leading/trailing commas
-  addressPart = addressPart.replace(/,{2,}/g, ',').trim(); // Multiple commas to single
-
-  // 5. Split into main components by the cleaned comma
-  let components = addressPart.split(',')
-    .map(comp => comp.trim())
-    .filter(Boolean);
-
-  components = components.map(comp => titleCase(comp));
-
-  // 6. Limit to 4 parts and join with ', '
-  return components.slice(0, 4).join(', ');
-};
-
+// titleCase function is now in address-utils.ts and used by formatDisplayAddress
 
 export default function SettingsPage() {
   const {
@@ -104,32 +26,25 @@ export default function SettingsPage() {
     setNotificationTime,
     notificationsEnabled,
     setNotificationsEnabled,
-    loading: addressLoading // Get loading state
+    loading: addressLoading
   } = useAddress();
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    setIsClient(true); // Component ready client-side
+    setIsClient(true);
   }, []);
 
-   // Redirect if no favourites and no selection after loading
    useEffect(() => {
-     // Only redirect if loading is finished AND it's not the initial hydration
-     // And not currently on the postcode page trying to get back
      if (isClient && !addressLoading && favourites.length === 0 && !selectedAddress && window.location.pathname !== '/postcode') {
-       console.log("Settings: No favourites or selected address, redirecting to postcode.");
        router.replace('/postcode');
      }
    }, [isClient, addressLoading, favourites, selectedAddress, router]);
 
-   // Function to format postcode with a space
-   const formatPostcode = (postcode: string): string => {
+   const formatPostcodeForDisplay = (postcode: string): string => {
      if (!postcode || typeof postcode !== 'string' || postcode.length < 4) return postcode;
-     // Ensure it's uppercase and remove existing spaces
      const cleanedPostcode = postcode.toUpperCase().replace(/\s/g, '');
-     // Insert space before the last 3 characters
      const outward = cleanedPostcode.slice(0, -3);
      const inward = cleanedPostcode.slice(-3);
      return `${outward} ${inward}`;
@@ -137,30 +52,25 @@ export default function SettingsPage() {
 
 
   const handleSelectFavourite = (fav: Address) => {
-    setAddress(fav); // Set the full address object
+    setAddress(fav);
     toast({
       title: 'Address Selected',
-      // description: `Showing collections for ${fav.address}`, // Keep it concise
     });
-    router.push('/dashboard'); // Go to dashboard after selecting
+    router.push('/dashboard');
   };
 
   const handleDeleteFavourite = (uprn: string) => {
     removeFavourite(uprn);
     toast({
       title: 'Favourite Removed',
-      // description: 'Address removed from your favourites.',
       variant: 'destructive'
     });
-     // Context handles clearing selectedAddress if needed.
-     // Redirect handled by useEffect if it was the last favourite.
   };
 
   const handleNotificationToggle = (enabled: boolean) => {
     setNotificationsEnabled(enabled);
      toast({
        title: `Notifications ${enabled ? 'Enabled' : 'Disabled'}`,
-       // description: enabled ? `You will be reminded at ${String(notificationTime).padStart(2, '0')}:00.` : '', // Simpler toast
      });
   };
 
@@ -170,18 +80,15 @@ export default function SettingsPage() {
    if (notificationsEnabled) {
      toast({
        title: 'Reminder Time Updated',
-       // description: `Reminder set to ${newTime.toString().padStart(2, '0')}:00.`,
      });
    }
  };
 
-
-  const availableTimes = Array.from({ length: 14 }, (_, i) => i + 8); // 8 AM to 9 PM (21:00)
+  const availableTimes = Array.from({ length: 14 }, (_, i) => i + 8);
 
   if (!isClient || addressLoading) {
      return (
        <div className="flex flex-col h-full bg-background">
-         {/* Show header even during load, but with back button */}
          <Header showBackButton={true} backDestination="/dashboard" showAddress={false} />
          <div className="flex-grow p-4 md:p-6 flex items-center justify-center">
            <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -190,18 +97,14 @@ export default function SettingsPage() {
      );
    }
 
-
   return (
     <div className="flex flex-col h-full bg-background">
-       {/* Use Header, back button goes to dashboard */}
       <Header showBackButton={true} backDestination="/dashboard" showAddress={false} />
 
       <div className="flex-grow p-4 md:p-6 space-y-6 overflow-y-auto">
-
-        {/* Favourite Addresses Section */}
         <div className="animate-fade-in">
           <h2 className="text-base font-semibold mb-3 text-muted-foreground px-1">SAVED ADDRESSES</h2>
-          <div className="bg-card rounded-lg border"> {/* Add border and bg for grouping */}
+          <div className="bg-card rounded-lg border">
             {favourites.length > 0 ? (
                 <ul className="divide-y">
                   {favourites.map((fav) => (
@@ -212,14 +115,13 @@ export default function SettingsPage() {
                          aria-label={`Select address: ${formatDisplayAddress(fav.address, fav.postcode)}. ${selectedAddress?.uprn === fav.uprn ? 'Currently selected.' : ''}`}
                        >
                           <MapPin className={`h-5 w-5 shrink-0 ${selectedAddress?.uprn === fav.uprn ? 'text-primary' : 'text-muted-foreground'}`} />
-                          <div className="flex-grow min-w-0"> {/* Added min-w-0 for proper truncation */}
+                          <div className="flex-grow min-w-0">
                            <span className={`block text-sm truncate ${selectedAddress?.uprn === fav.uprn ? 'font-semibold text-primary' : 'text-foreground'}`}>
-                              {formatDisplayAddress(fav.address, fav.postcode)} {/* Use updated formatter */}
+                              {formatDisplayAddress(fav.address, fav.postcode)}
                            </span>
-                           <span className="block text-xs text-muted-foreground">{formatPostcode(fav.postcode)}</span> {/* Use formatted postcode */}
+                           <span className="block text-xs text-muted-foreground">{formatPostcodeForDisplay(fav.postcode)}</span>
                          </div>
                         </button>
-                       {/* Show Check icon if selected */}
                        {selectedAddress?.uprn === fav.uprn && (
                          <Check className="h-5 w-5 text-primary mr-2 shrink-0" />
                        )}
@@ -240,10 +142,9 @@ export default function SettingsPage() {
                 No saved addresses.
               </p>
             )}
-             {/* Add New Address Button */}
              <div className="border-t p-3">
                 <Button variant="ghost" onClick={() => {
-                  setAddress(null); // Clear current selection to force postcode page
+                  setAddress(null);
                   router.push('/postcode');
                   }} className="w-full justify-start text-primary font-semibold">
                   <PlusCircle className="mr-2 h-4 w-4" /> Add New Address
@@ -252,17 +153,12 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Separator is optional, depends on visual preference */}
-        {/* <Separator className="my-4" /> */}
-
-        {/* Notifications Section */}
         <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <h2 className="text-base font-semibold mb-3 text-muted-foreground px-1">NOTIFICATIONS</h2>
           <div className="bg-card rounded-lg border p-4 space-y-4">
             <div className="flex items-center justify-between gap-4">
               <Label htmlFor="notifications-enabled" className="flex-grow cursor-pointer text-sm">
                 Enable Collection Reminders
-                {/* <p className="text-xs text-muted-foreground font-normal mt-0.5">Get notified the day before.</p> */}
               </Label>
               <Switch
                 id="notifications-enabled"
@@ -295,9 +191,6 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
-
-        {/* Add other sections like About, Feedback etc. here following the same pattern */}
-
       </div>
     </div>
   );

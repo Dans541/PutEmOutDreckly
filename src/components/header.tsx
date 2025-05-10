@@ -1,27 +1,32 @@
+
 'use client';
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, Settings, ArrowLeft, Menu, Trash2 } from 'lucide-react'; // Added Menu
+import { Moon, Sun, Settings, ArrowLeft, Menu, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useRouter } from 'next/navigation';
-import { useAddress } from '@/context/address-context'; // Import useAddress
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
+import { useAddress } from '@/context/address-context';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatDisplayAddress } from '@/lib/address-utils'; // Import the centralized formatter
 
 interface HeaderProps {
   showBackButton?: boolean;
-  backDestination?: string; // Optional specific destination for back button
-  showAddress?: boolean; // Option to show the address in the header
+  backDestination?: string;
+  pageTitle?: string; // Prop for context (e.g., accessibility, document title)
+  showAddress?: boolean;
 }
 
 export function Header({
   showBackButton = false,
   backDestination,
-  showAddress = true, // Default to true for dashboard-like headers
+  // pageTitle prop is not directly rendered if showAddress is true and address is available
+  showAddress = true,
 }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
-  const { selectedAddress, loading } = useAddress(); // Get selected address and loading state
+  const pathname = usePathname(); // Get current path
+  const { selectedAddress, loading } = useAddress();
 
   const handleBack = () => {
     if (backDestination) {
@@ -31,63 +36,59 @@ export function Header({
     }
   };
 
-  // Function to format address for display (optional: shorten if needed)
-  const formatDisplayAddress = (address: string | undefined): string => {
-    if (!address) return '';
-    // Example: Simple truncation (adjust logic as needed)
-    // const maxLength = 25;
-    // return address.length > maxLength ? `${address.substring(0, maxLength)}...` : address;
-    return address; // Return full address for now
+  // Helper to determine the displayed text in the header
+  const getHeaderText = (): string | React.ReactNode => {
+    if (loading) {
+      return <Skeleton className="h-4 w-32 ml-1" />;
+    }
+    if (showAddress && selectedAddress) {
+      // Use the centralized formatter
+      const formatted = formatDisplayAddress(selectedAddress.address, selectedAddress.postcode);
+      // For header, let's use the first 2-3 parts for brevity if too long, or all if short
+      // The imported formatDisplayAddress already limits to 4 parts, which was what the old hardcoded one did.
+      // The 'truncate' class will handle overflow.
+      return formatted || 'Address Details';
+    }
+    // Fallback to App Title
+    return (
+      <Link href="/" className="flex items-center space-x-2 ml-1">
+        <Trash2 className="h-5 w-5 text-primary" />
+        <span className="font-semibold text-base hidden sm:inline-block">Put 'Em Out Dreckly</span>
+      </Link>
+    );
   };
 
+
   return (
-    // Use border-b for separation, standard height
     <header className="sticky top-0 z-40 w-full border-b bg-background">
       <div className="container flex h-14 items-center justify-between px-4">
-        {/* Left side: Back/Menu button and optional Title/Address */}
         <div className="flex items-center gap-1">
           {showBackButton ? (
             <Button variant="ghost" size="icon" onClick={handleBack} aria-label="Go back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           ) : (
-             // Show Menu icon instead of back button (placeholder for drawer nav)
-             // Link Menu to settings for now, replace with sidebar/drawer logic later
             <Button variant="ghost" size="icon" asChild aria-label="Open settings menu">
-               <Link href="/settings">
-                 <Menu className="h-5 w-5" />
-               </Link>
+              <Link href="/settings">
+                <Menu className="h-5 w-5" />
+              </Link>
             </Button>
           )}
 
-           {/* Display Address or App Title */}
-           {showAddress && !loading && selectedAddress ? (
-               <span className="text-sm font-medium text-muted-foreground truncate ml-1" title={selectedAddress.address}>
-                 {formatDisplayAddress(selectedAddress.address)}
-               </span>
-           ) : showAddress && loading ? (
-               <Skeleton className="h-4 w-32 ml-1" />
-           ) : (
-              // Fallback to App Title if address isn't shown or available
-              <Link href="/" className="flex items-center space-x-2 ml-1">
-                 <Trash2 className="h-5 w-5 text-primary" />
-                 <span className="font-semibold text-base hidden sm:inline-block">Put 'Em Out Dreckly</span>
-               </Link>
-           )}
-
+          {/* Display Address or App Title */}
+          <div className="text-sm font-medium text-muted-foreground truncate ml-1" title={selectedAddress?.address || ''}>
+            {getHeaderText()}
+          </div>
         </div>
 
-        {/* Right side: Theme toggle and Settings button */}
         <div className="flex items-center gap-0.5">
-           {/* Settings Button - always visible unless it's the settings page itself? */}
-           {/* Conditionally hide settings icon if already on settings page? */}
-          {router.pathname !== '/settings' && ( // Example: Hide on settings page
-             <Button variant="ghost" size="icon" asChild aria-label="Go to settings">
-               <Link href="/settings">
-                 <Settings className="h-5 w-5" />
-               </Link>
-             </Button>
-           )}
+          {pathname !== '/settings' && (
+            <Button variant="ghost" size="icon" asChild aria-label="Go to settings">
+              <Link href="/settings">
+                <Settings className="h-5 w-5" />
+              </Link>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
