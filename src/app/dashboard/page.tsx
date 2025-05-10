@@ -1,4 +1,4 @@
-tsx
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -174,7 +174,7 @@ export default function DashboardPage() {
                   </div>
 
                   {nextCollection && (
-                    <Card className="animate-fade-in">
+                    <Card className="animate-fade-in shadow-md rounded-xl">
                       <CardHeader className="pb-3">
                         <CardTitle className="text-center text-xl md:text-2xl font-semibold text-primary">
                           Next Collection
@@ -191,24 +191,24 @@ export default function DashboardPage() {
                   {collectionEntries.map((entry, index) => (
                     <Card
                       key={`${entry.type}-${index}`}
-                      className={`flex items-center justify-between p-5 rounded-lg shadow-md
+                      className={`flex items-center justify-between p-5 rounded-xl shadow-lg
                         ${
                           entry.type === 'foodWaste'
-                            ? 'bg-green-700 dark:bg-green-700 text-primary-foreground'
+                            ? 'bg-green-700 text-primary-foreground dark:bg-green-800 dark:text-primary-foreground'
                             : entry.type === 'recycling'
-                            ? 'bg-lime-600 dark:bg-lime-600 text-primary-foreground'
-                            : 'bg-gray-600 dark:bg-gray-600 text-primary-foreground'
+                            ? 'bg-lime-600 text-primary-foreground dark:bg-lime-700 dark:text-primary-foreground'
+                            : 'bg-gray-600 text-primary-foreground dark:bg-gray-700 dark:text-primary-foreground'
                         }
                       `}
                     >
                       <div className="flex items-center gap-5">
                         <div className={`flex items-center justify-center h-14 w-14 rounded-lg
-                  ${
-                         entry.type === 'foodWaste' ? 'bg-green-800 dark:bg-green-800' :
-                           entry.type === 'recycling' ? 'bg-lime-700 dark:bg-lime-700' :
-                           'bg-gray-700 dark:bg-gray-700'
-                  }`}>
-                          <BinIcon binType={entry.type} className="h-9 w-9 text-white dark:text-white" />
+                            ${
+                              entry.type === 'foodWaste' ? 'bg-green-800 dark:bg-green-900' :
+                              entry.type === 'recycling' ? 'bg-lime-700 dark:bg-lime-800' :
+                              'bg-gray-700 dark:bg-gray-800'
+                            }`}>
+                          <BinIcon binType={entry.type} className="h-9 w-9 text-white" />
                         </div>
                         <div className="flex flex-col">
                           <p className="font-semibold text-lg leading-tight">{formatDate(entry.date)}</p>
@@ -242,4 +242,3 @@ export default function DashboardPage() {
     </>
   );
 }
-
