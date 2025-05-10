@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -74,22 +75,8 @@ export default function DashboardPage() {
   const formatDate = (date: Date | null): string => {
     if (!date || !isValid(date)) return 'Not scheduled';
     try {
-      // Use 'do' format specifier to get the day with the correct suffix (st, nd, rd, th)
-      // and ensure compatibility with date-fns
-      const dayWithSuffix = format(date, 'do');
-      let suffix;
-      const dayOfMonth = parseInt(format(date, 'd')); // Get just the day number
-      if (dayOfMonth === 1 || dayOfMonth === 21 || dayOfMonth === 31) {
-        suffix = 'st';
-      } else if (dayOfMonth === 2 || dayOfMonth === 22) {
-        suffix = 'nd';
-      } else if (dayOfMonth === 3 || dayOfMonth === 23) {
-        suffix = 'rd';
-      } else {
-        suffix = 'th';
-      }
-      // Construct the format string with the day and its suffix
- return format(date, `EEEE, d'${suffix}' MMMM`); // e.g., Wednesday, 14th May, Monday, 21st June
+      // Format: Wednesday, 14 May
+      return format(date, 'EEEE, d MMMM');
     } catch (error) {
       console.error('Error formatting date:', error, date);
       return 'Invalid Date';
@@ -214,8 +201,8 @@ export default function DashboardPage() {
                           Next Collection
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="text-center"> {/* text-white removed to allow theme colors */}
- <p className="text-2xl md:text-3xl font-bold mb-1 text-foreground">{formatDate(nextCollection.date)}</p> {/* text-black changed to text-foreground */}
+                      <CardContent className="text-center">
+                        <p className="text-2xl md:text-3xl font-bold mb-1 text-foreground">{formatDate(nextCollection.date)}</p>
                         <p className="text-lg text-muted-foreground">{formatRelativeDays(nextCollection.date)}</p>
                       </CardContent>
                     </Card>
@@ -225,33 +212,32 @@ export default function DashboardPage() {
                 <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
                   {collectionEntries.map((entry, index) => (
                     <Card
-                      key={`${entry.type}-${index}`} // Use index in key for stability if types repeat
+                      key={`${entry.type}-${index}`} 
                       className={`flex items-center justify-between p-4 text-white
                         ${
                           entry.type === 'foodWaste'
-                            ? 'bg-green-700' // Dark green for Food Waste
+                            ? 'bg-green-700' 
                             : entry.type === 'recycling'
-                            ? 'bg-lime-600' // Light green for Recycling
-                            : 'bg-gray-600' // Dark gray for Rubbish
+                            ? 'bg-lime-600' 
+                            : 'bg-gray-600' 
                         }
                       `}
                     >
                       <div className="flex items-center gap-4">
                         <div className={`flex items-center justify-center h-12 w-12 rounded-lg
                   ${
-                         entry.type === 'foodWaste' ? 'bg-green-800' : // Slightly darker green
-                           entry.type === 'recycling' ? 'bg-lime-700' : // Slightly darker light green
-                           'bg-gray-700' // Slightly darker gray
+                         entry.type === 'foodWaste' ? 'bg-green-800' : 
+                           entry.type === 'recycling' ? 'bg-lime-700' : 
+                           'bg-gray-700' 
                   }`}>
-                  <BinIcon binType={entry.type} className="h-8 w-8 text-white" />
- </div>
- <div className="flex flex-col text-white"> {/* Changed to flex-col to stack text */}
-                          <p className="font-medium text-xl leading-none">{entry.name}</p> {/* Increased text size */}
- <p className="text-sm text-white/80">{entry.name === 'Rubbish' ? 'General Waste' : entry.name}</p> {/* Use white with reduced opacity, and map Rubbish to General Waste */}
+                          <BinIcon binType={entry.type} className="h-8 w-8 text-white" />
+                        </div>
+                        <div className="flex flex-col">
+                          <p className="font-semibold text-base leading-tight text-white">{formatDate(entry.date)}</p>
+                          <p className="text-sm text-white/80 leading-tight">{entry.name}</p>
                         </div>
                     </div>
-                      <span className="text-sm font-medium">
-                         {/* This text will inherit 'text-white' from the Card */}
+                      <span className="text-sm font-medium text-white">
                         {formatRelativeDays(entry.date)}
                       </span>
                     </Card>
