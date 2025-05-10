@@ -9,9 +9,9 @@ interface BinIconProps extends SVGProps<SVGSVGElement> {
 
 // Map bin types to colors and icons
 const binStyles = {
-  generalWaste: { icon: Trash2, colorClass: 'text-gray-500 dark:text-gray-400', label: 'Rubbish Bin' },
-  recycling: { icon: Recycle, colorClass: 'text-blue-500 dark:text-gray-400', label: 'Recycling Bin' }, // Changed dark mode color
-  foodWaste: { icon: Utensils, colorClass: 'text-orange-600 dark:text-gray-400', label: 'Food Waste Bin' }, // Changed dark mode color
+  generalWaste: { icon: Trash2, colorClass: 'text-gray-500 dark:text-white', label: 'Rubbish Bin' },
+  recycling: { icon: Recycle, colorClass: 'text-blue-500 dark:text-white', label: 'Recycling Bin' },
+  foodWaste: { icon: Utensils, colorClass: 'text-orange-600 dark:text-white', label: 'Food Waste Bin' },
   // Add more types if necessary
   default: { icon: Package, colorClass: 'text-muted-foreground', label: 'Bin' }, // Fallback
 };
@@ -29,3 +29,4 @@ export function BinIcon({ binType, className, colorClass, ...props }: BinIconPro
     />
   );
 }
+
