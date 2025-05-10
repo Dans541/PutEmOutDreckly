@@ -1,3 +1,4 @@
+
 import type { SVGProps } from 'react';
 import { Trash2, Recycle, Utensils, Package } from 'lucide-react'; // Package as a fallback
 
@@ -6,11 +7,11 @@ interface BinIconProps extends SVGProps<SVGSVGElement> {
   colorClass?: string; // Allow passing Tailwind color classes
 }
 
-// Map bin types to colors and icons (adjust colors as needed)
+// Map bin types to colors and icons
 const binStyles = {
   generalWaste: { icon: Trash2, colorClass: 'text-gray-500 dark:text-gray-400', label: 'Rubbish Bin' },
-  recycling: { icon: Recycle, colorClass: 'text-blue-500 dark:text-blue-400', label: 'Recycling Bin' },
-  foodWaste: { icon: Utensils, colorClass: 'text-orange-600 dark:text-orange-400', label: 'Food Waste Bin' },
+  recycling: { icon: Recycle, colorClass: 'text-blue-500 dark:text-gray-400', label: 'Recycling Bin' }, // Changed dark mode color
+  foodWaste: { icon: Utensils, colorClass: 'text-orange-600 dark:text-gray-400', label: 'Food Waste Bin' }, // Changed dark mode color
   // Add more types if necessary
   default: { icon: Package, colorClass: 'text-muted-foreground', label: 'Bin' }, // Fallback
 };
