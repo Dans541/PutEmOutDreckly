@@ -22,8 +22,6 @@ export const titleCase = (str: string): string => {
         return numPart + letterPart.toUpperCase();
     }
     // Case 2: Word-Number-Letter or Word-Number e.g. Flat1a -> Flat1A, Block2 -> Block2
-    // This needs to correctly capitalize the first letter of the word part,
-    // and then the letter part if it exists after a number.
     if (/^[a-zA-Z]+\d+[a-zA-Z]*$/.test(word)) {
         let result = '';
         let i = 0;
@@ -49,14 +47,15 @@ export const titleCase = (str: string): string => {
   }).join(' ');
 };
 
-export const formatDisplayAddress = (fullAddressString: string | undefined, postcode: string | undefined): string => {
+
+export const formatDisplayAddress = (fullAddressString: string | undefined, postcodeProp: string | undefined): string => {
   if (!fullAddressString || typeof fullAddressString !== 'string') return 'Invalid Address';
 
   let addressPart = fullAddressString;
 
   // 1. Remove Postcode (if provided and found at the end, case-insensitive, flexible spacing)
-  if (postcode) {
-    const normalizedPostcode = postcode.replace(/\s+/g, '').toUpperCase();
+  if (postcodeProp) {
+    const normalizedPostcode = postcodeProp.replace(/\s+/g, '').toUpperCase();
     // Regex to match postcode at the end of the string, possibly preceded by a comma and/or spaces
     const postcodeRegexEnd = new RegExp(`(?:\\s*,\\s*|\\s+)${normalizedPostcode.slice(0, -3)}\\s?${normalizedPostcode.slice(-3)}\\s*$`, 'gi');
     addressPart = addressPart.replace(postcodeRegexEnd, '').trim();
@@ -95,4 +94,12 @@ export const formatDisplayAddress = (fullAddressString: string | undefined, post
 
   // 8. Limit to 4 elements and join with ', '
   return components.slice(0, 4).join(', ');
+};
+
+export const formatPostcode = (postcode: string | undefined): string => {
+  if (!postcode || typeof postcode !== 'string' || postcode.length < 4) return postcode || '';
+  const cleanedPostcode = postcode.toUpperCase().replace(/\s/g, '');
+  const outward = cleanedPostcode.slice(0, -3);
+  const inward = cleanedPostcode.slice(-3);
+  return `${outward} ${inward}`;
 };
