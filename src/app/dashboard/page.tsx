@@ -1,3 +1,4 @@
+tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -190,22 +191,22 @@ export default function DashboardPage() {
                   {collectionEntries.map((entry, index) => (
                     <Card
                       key={`${entry.type}-${index}`}
-                      className={`flex items-center justify-between p-5 
+                      className={`flex items-center justify-between p-5 rounded-lg shadow-md
                         ${
                           entry.type === 'foodWaste'
-                            ? 'bg-green-700 text-primary-foreground' // Dark green for food
+                            ? 'bg-green-700 dark:bg-green-700 text-primary-foreground'
                             : entry.type === 'recycling'
-                            ? 'bg-lime-600 text-primary-foreground' // Lime green for recycling
-                            : 'bg-gray-600 text-primary-foreground' // Grey for rubbish
+                            ? 'bg-lime-600 dark:bg-lime-600 text-primary-foreground'
+                            : 'bg-gray-600 dark:bg-gray-600 text-primary-foreground'
                         }
                       `}
                     >
                       <div className="flex items-center gap-5">
                         <div className={`flex items-center justify-center h-14 w-14 rounded-lg
                   ${
-                         entry.type === 'foodWaste' ? 'bg-green-800' : // Darker shade for icon bg
-                           entry.type === 'recycling' ? 'bg-lime-700' : // Darker shade for icon bg
-                           'bg-gray-700' // Darker shade for icon bg
+                         entry.type === 'foodWaste' ? 'bg-green-800 dark:bg-green-800' :
+                           entry.type === 'recycling' ? 'bg-lime-700 dark:bg-lime-700' :
+                           'bg-gray-700 dark:bg-gray-700'
                   }`}>
                           <BinIcon binType={entry.type} className="h-9 w-9 text-white dark:text-white" />
                         </div>
@@ -241,3 +242,4 @@ export default function DashboardPage() {
     </>
   );
 }
+
