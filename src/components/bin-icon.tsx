@@ -1,10 +1,10 @@
 
 import type { SVGProps } from 'react';
-import { Trash2, Recycle, Utensils, Package } from 'lucide-react'; // Package as a fallback
+import { Trash2, Recycle, Utensils, Package } from 'lucide-react'; // Package as a fallback if needed, or remove if not
 
 interface BinIconProps extends SVGProps<SVGSVGElement> {
   binType: 'generalWaste' | 'recycling' | 'foodWaste' | string; // Allow any string for potential future types
-  colorClass?: string; // Allow passing Tailwind color classes
+  colorClass?: string; // Allow passing Tailwind color classesgit a
 }
 
 // Map bin types to colors and icons

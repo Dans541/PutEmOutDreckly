@@ -16,6 +16,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="h-full">
+      <head>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></link>
+      </head>
       <body
         // Added min-h-screen and flex-col to ensure footer behavior if needed
         className={`antialiased flex flex-col min-h-screen h-full`}

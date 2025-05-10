@@ -169,20 +169,22 @@ export default function DashboardPage() {
             {binData && selectedAddress ? (
               collectionEntries.length > 0 ? (
                 <div className="flex-grow p-4 md:p-6 space-y-6 overflow-y-auto"> {/* Increased space-y */}
-                  <div className="flex justify-center items-center mb-4">
-                    <DashboardIllustration className="h-24 md:h-32 w-auto text-primary" data-ai-hint="recycling bins" />
+ <div className="flex justify-center items-center mb-4">
+                    <DashboardIllustration className="h-48 md:h-64 w-auto text-primary" data-ai-hint="recycling bins" />
                   </div>
 
                   {nextCollection && (
                     <Card className="animate-fade-in shadow-md rounded-xl bg-card">
                       <CardHeader className="pt-4 pb-2"> {/* Adjusted padding */}
-                        <CardTitle className="text-center text-base font-medium text-primary"> {/* Adjusted font size and weight */}
+                        <CardTitle className="text-center text-lg font-medium text-primary"> {/* Adjusted font size and weight */}
                           Next Collection
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="text-center pt-1 pb-4"> {/* Adjusted padding */}
-                        <p className="text-2xl md:text-3xl font-semibold mb-1 text-foreground">{formatDate(nextCollection.date)}</p> {/* Adjusted font weight */}
-                        <p className="text-sm text-muted-foreground">{formatRelativeDays(nextCollection.date)}</p> {/* Adjusted font size */}
+                        <div className="text-center">
+                          <p className="text-2xl md:text-3xl font-semibold mb-1 text-foreground">{formatDate(nextCollection.date)}</p> {/* Adjusted font weight */}
+                          <p className="text-sm text-muted-foreground">{formatRelativeDays(nextCollection.date)}</p> {/* Adjusted font size */}
+                        </div>
                       </CardContent>
                     </Card>
                   )}
@@ -224,8 +226,8 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="flex flex-col flex-grow items-center justify-start text-center p-6 space-y-4">
-                  <DashboardIllustration className="h-24 md:h-32 w-auto text-primary mb-4" data-ai-hint="empty calendar" />
-                  <h2 className="text-xl font-semibold">No Upcoming Collections Soon!</h2>
+ <DashboardIllustration className="h-12 md:h-16 w-auto text-primary mb-4" data-ai-hint="empty calendar" />
+                  <h2 className="text-xl font-semibold">No Upcoming Collections!</h2>
                   <p className="text-muted-foreground max-w-sm">
                     You're all caught up with your bin collections for the near future. Check back later for updates.
                   </p>
