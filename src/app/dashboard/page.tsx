@@ -1,8 +1,8 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import type { Address } from '@/services/cornwall-council-api';
 import { useAddress } from '@/context/address-context';
 import { getBinCollectionData, type BinCollectionData } from '@/services/cornwall-council-api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -125,11 +125,11 @@ export default function DashboardPage() {
             <div className="flex items-center gap-5">
               <Skeleton className="h-14 w-14 rounded-md" />
               <div className="space-y-1.5">
-                <Skeleton className="h-5 w-32" /> {/* Adjusted for larger text */}
+                <Skeleton className="h-5 w-32" />
                 <Skeleton className="h-4 w-24" />
               </div>
             </div>
-            <Skeleton className="h-5 w-16" /> {/* Adjusted for larger text */}
+            <Skeleton className="h-5 w-16" />
           </div>
         ))}
       </div>
@@ -157,7 +157,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <Header showBackButton={false} pageTitle={selectedAddress ? selectedAddress.address : 'Dashboard'} />
+      <Header showBackButton={false} pageTitle={selectedAddress?.address ? selectedAddress.address : 'Dashboard'} />
       <div className="flex flex-col h-full bg-background overflow-y-auto">
         {isLoading ? (
           renderSkeleton()
@@ -193,21 +193,21 @@ export default function DashboardPage() {
                       className={`flex items-center justify-between p-5 
                         ${
                           entry.type === 'foodWaste'
-                            ? 'bg-green-700 text-primary-foreground'
+                            ? 'bg-green-700 text-primary-foreground' // Dark green for food
                             : entry.type === 'recycling'
-                            ? 'bg-lime-600 text-primary-foreground'
-                            : 'bg-gray-600 text-primary-foreground'
+                            ? 'bg-lime-600 text-primary-foreground' // Lime green for recycling
+                            : 'bg-gray-600 text-primary-foreground' // Grey for rubbish
                         }
                       `}
                     >
                       <div className="flex items-center gap-5">
                         <div className={`flex items-center justify-center h-14 w-14 rounded-lg
                   ${
-                         entry.type === 'foodWaste' ? 'bg-green-800' :
-                           entry.type === 'recycling' ? 'bg-lime-700' :
-                           'bg-gray-700'
+                         entry.type === 'foodWaste' ? 'bg-green-800' : // Darker shade for icon bg
+                           entry.type === 'recycling' ? 'bg-lime-700' : // Darker shade for icon bg
+                           'bg-gray-700' // Darker shade for icon bg
                   }`}>
-                          <BinIcon binType={entry.type} className="h-9 w-9 text-white" />
+                          <BinIcon binType={entry.type} className="h-9 w-9 text-white dark:text-white" />
                         </div>
                         <div className="flex flex-col">
                           <p className="font-semibold text-lg leading-tight">{formatDate(entry.date)}</p>
