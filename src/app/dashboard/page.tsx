@@ -158,7 +158,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <Header showBackButton={false} pageTitle={selectedAddress?.address ? selectedAddress.address : 'Dashboard'} />
+      <Header showBackButton={false} />
       <div className="flex flex-col h-full bg-background overflow-y-auto">
         {isLoading ? (
           renderSkeleton()
@@ -168,26 +168,26 @@ export default function DashboardPage() {
           <div className="flex-grow flex flex-col">
             {binData && selectedAddress ? (
               collectionEntries.length > 0 ? (
-                <div className="flex-grow p-4 md:p-6 space-y-4 overflow-y-auto">
+                <div className="flex-grow p-4 md:p-6 space-y-6 overflow-y-auto"> {/* Increased space-y */}
                   <div className="flex justify-center items-center mb-4">
                     <DashboardIllustration className="h-24 md:h-32 w-auto text-primary" data-ai-hint="recycling bins" />
                   </div>
 
                   {nextCollection && (
-                    <Card className="animate-fade-in shadow-md rounded-xl">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-center text-xl md:text-2xl font-semibold text-primary">
+                    <Card className="animate-fade-in shadow-md rounded-xl bg-card">
+                      <CardHeader className="pt-4 pb-2"> {/* Adjusted padding */}
+                        <CardTitle className="text-center text-base font-medium text-primary"> {/* Adjusted font size and weight */}
                           Next Collection
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="text-center py-4">
-                        <p className="text-2xl md:text-3xl font-bold mb-1 text-foreground">{formatDate(nextCollection.date)}</p>
-                        <p className="text-lg text-muted-foreground">{formatRelativeDays(nextCollection.date)}</p>
+                      <CardContent className="text-center pt-1 pb-4"> {/* Adjusted padding */}
+                        <p className="text-2xl md:text-3xl font-semibold mb-1 text-foreground">{formatDate(nextCollection.date)}</p> {/* Adjusted font weight */}
+                        <p className="text-sm text-muted-foreground">{formatRelativeDays(nextCollection.date)}</p> {/* Adjusted font size */}
                       </CardContent>
                     </Card>
                   )}
 
-                <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                <div className="space-y-4 animate-fade-in" style={{ animationDelay: '0.2s' }}> {/* Increased space-y */}
                   {collectionEntries.map((entry, index) => (
                     <Card
                       key={`${entry.type}-${index}`}
@@ -208,14 +208,14 @@ export default function DashboardPage() {
                               entry.type === 'recycling' ? 'bg-lime-700 dark:bg-lime-800' :
                               'bg-gray-700 dark:bg-gray-800'
                             }`}>
-                          <BinIcon binType={entry.type} className="h-9 w-9 text-white" />
+                           <BinIcon binType={entry.type} className="h-9 w-9 text-white" />
                         </div>
                         <div className="flex flex-col">
-                          <p className="font-semibold text-lg leading-tight">{formatDate(entry.date)}</p>
-                          <p className="text-sm opacity-80 leading-tight">{entry.name}</p>
+                           <p className="font-semibold text-lg leading-tight text-white">{formatDate(entry.date)}</p>
+                           <p className="text-sm opacity-80 leading-tight text-white">{entry.name}</p>
                         </div>
                     </div>
-                      <span className="text-base font-medium">
+                       <span className="text-base font-medium text-white">
                         {formatRelativeDays(entry.date)}
                       </span>
                     </Card>
@@ -242,3 +242,4 @@ export default function DashboardPage() {
     </>
   );
 }
+
